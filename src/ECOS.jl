@@ -1,0 +1,5 @@
+module ECOS
+
+# package code goes here
+
+end # module

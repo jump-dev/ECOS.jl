@@ -13,5 +13,5 @@ before_install:
   - sudo apt-get update -qq -y
   - sudo apt-get install libpcre3-dev julia -y
 script:
-  - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir("ECOS"))`); Pkg.pin("ECOS"); Pkg.resolve()'
+  - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir("ECOS"))`); Pkg.pin("ECOS"); Pkg.resolve(); Pkg.build("ECOS")'
   - julia -e 'using ECOS; @assert isdefined(:ECOS); @assert typeof(ECOS) === Module'

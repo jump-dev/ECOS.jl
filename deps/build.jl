@@ -19,7 +19,8 @@ provides(SimpleBuild,
         FileRule(joinpath(prefix,"lib","libecos.so"),@build_steps begin
             ChangeDirectory(srcdir)
             `cat ${BinDeps.depsdir(ecos)}/make-so.patch` |> `patch Makefile`
-            `make CFLAGS="-fPIC" ecos.so`
+            `cat ${BinDeps.depsdir(ecos)}/ecos-fpic.patch` |> `patch ecos.mk`
+            `make ecos.so`
             `mv libecos.so $prefix/lib`
         end)
     end),[ecos], os = :Unix)

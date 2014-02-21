@@ -201,7 +201,7 @@ end
 # This is the straightforward translation from the C API.
 # TODO: allow the matrix to be a Julia SparseMatrixCSC instead
 function setup(n::Int64, m::Int64, p::Int64, l::Int64, ncones::Int64, q::Array{Int64}, Gpr::Array{Float64}, Gjc::Array{Int64}, Gir::Array{Int64}, Apr::Array{Float64}, Ajc::Array{Int64}, Air::Array{Int64}, c::Array{Float64}, h::Array{Float64}, b::Array{Float64})
-    problem = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork}, (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}), n, m, p, l, ncones, &q, &Gpr, &Gjc, &Gir, &Apr, &Ajc, &Air, &c, &h, &b)
+    problem = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork}, (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}), n, m, p, l, ncones, q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
 end
 
 function solve(problem::Ptr{Cpwork})

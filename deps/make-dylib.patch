@@ -1,0 +1,5 @@
+56a57,60
+> 
+> ecos.dylib: ldl amd ecos
+> 	$(C) -shared -o libecos.dylib ecos.o kkt.o cone.o preproc.o spla.o splamm.o timer.o equil.o -lldl -lamd -Lexternal/amd/ -Lexternal/ldl/ $(LIBS)
+> 

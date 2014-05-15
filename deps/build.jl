@@ -16,10 +16,22 @@ provides(SimpleBuild,
     (@build_steps begin
         GetSources(ecos)
         CreateDirectory(joinpath(prefix,"lib"))
+        FileRule(joinpath(prefix,"lib","libecos.dylib"),@build_steps begin
+            ChangeDirectory(srcdir)
+            `cat ${BinDeps.depsdir(ecos)}/make-dylib.patch` |> `patch Makefile`
+            `cat ${BinDeps.depsdir(ecos)}/ecos-fpic.patch` |> `patch ecos.mk`
+            `make ecos.dylib`
+            `mv libecos.dylib $prefix/lib`
+        end)
+    end),[ecos], os = :Darwin)
+
+provides(SimpleBuild,
+    (@build_steps begin
+        GetSources(ecos)
+        CreateDirectory(joinpath(prefix,"lib"))
         FileRule(joinpath(prefix,"lib","libecos.so"),@build_steps begin
             ChangeDirectory(srcdir)
             `cat ${BinDeps.depsdir(ecos)}/make-so.patch` |> `patch Makefile`
-            @osx_only `cat ${BinDeps.depsdir(ecos)}/make-dylib.patch` |> `patch Makefile`
             `cat ${BinDeps.depsdir(ecos)}/ecos-fpic.patch` |> `patch ecos.mk`
             `make ecos.so`
             `mv libecos.so $prefix/lib`

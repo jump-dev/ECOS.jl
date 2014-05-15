@@ -7,4 +7,4 @@
 ---
 > 
 > ecos.so: ldl amd ecos
-> 	$(C) -shared -o libecos.so ecos.o kkt.o cone.o preproc.o spla.o splamm.o timer.o -lldl -lamd -Lexternal/amd/ -Lexternal/ldl/ $(LIBS)
+> 	$(C) -shared -o libecos.so ecos.o kkt.o cone.o preproc.o spla.o splamm.o timer.o equil.o -lldl -lamd -Lexternal/amd/ -Lexternal/ldl/ $(LIBS)

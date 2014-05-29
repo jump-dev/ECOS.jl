@@ -6,11 +6,14 @@ using BinDeps
     ecos = library_dependency("ecos",aliases=["libecos"])
 end
 
-provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/master.zip"),
-    [ecos], os = :Unix, unpacked_dir="ecos-master")
+# The last stable version of ECOS seems to be v1.0.3 as of 05/29/2014
+# This is safer than unpacking from master which may cause ECOS.jl to
+# not work properly
+provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/v1.0.3.zip"),
+    [ecos], os = :Unix, unpacked_dir="ecos-1.0.3")
 
 prefix = joinpath(BinDeps.depsdir(ecos),"usr")
-srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-master/")
+srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-1.0.3/")
 
 provides(SimpleBuild,
     (@build_steps begin

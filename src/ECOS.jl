@@ -242,7 +242,7 @@ ArrayFloat64OrNothing = Union(Array{Float64, }, Nothing)
 function setup(;n::Int64=nothing, m::Int64=nothing, p::Int64=0, l::Int64=0,
         ncones::Int64=0, q::Array{Int64, }=[], G::VecOrMatOrSparseOrNothing=nothing,
         A::VecOrMatOrSparseOrNothing=nothing, c::Array{Float64, }=nothing,
-        h::Array{Float64, }=nothing, b::ArrayFloat64OrNothing=nothing)
+        h::ArrayFloat64OrNothing=nothing, b::ArrayFloat64OrNothing=nothing)
     if q == []
         q = convert(Ptr{Int64}, C_NULL)
     end

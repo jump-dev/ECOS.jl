@@ -104,8 +104,8 @@ immutable Cstats
     nitref3::Clong
     tsetup::Cdouble
     tsolve::Cdouble
-    tfactor::Cdouble	
-    tkktsolve::Cdouble	
+    tfactor::Cdouble
+    tkktsolve::Cdouble
     torder::Cdouble
     tkktcreate::Cdouble
     ttranspose::Cdouble
@@ -121,6 +121,9 @@ immutable Csettings
     feastol::Cdouble
     abstol::Cdouble
     reltol::Cdouble
+    feastol_inacc::Cdouble
+    abstol_inacc::Cdouble
+    reltol_inacc::Cdouble
     nitref::Clong
     maxit::Clong
     verbose::Clong
@@ -132,6 +135,7 @@ immutable Cpwork
     m::Clong
     p::Clong
     D::Clong
+
     # Variables
     x::Ptr{Cdouble}
     y::Ptr{Cdouble}
@@ -140,12 +144,27 @@ immutable Cpwork
     lambda::Ptr{Cdouble}
     kap::Cdouble
     tau::Cdouble
+
+    # Best iterates seen so far
+    best_x::Ptr{Cdouble}
+    best_y::Ptr{Cdouble}
+    best_z::Ptr{Cdouble}
+    best_s::Ptr{Cdouble}
+    best_kap::Cdouble
+    best_tau::Cdouble
+    best_cx::Cdouble
+    best_by::Cdouble
+    best_hz::Cdouble
+    best_info::Ptr{Cstats}
+
     # Temporary variables
     dsaff::Ptr{Cdouble}
     dzaff::Ptr{Cdouble}
     W_times_dzaff::Ptr{Cdouble}
+    dsaff_by_W::Ptr{Cdouble}
     saff::Ptr{Cdouble}
     zaff::Ptr{Cdouble}
+
     # Cone
     C::Ptr{Ccone}
     A::Ptr{Cspmat}
@@ -153,10 +172,17 @@ immutable Cpwork
     c::Ptr{Cdouble}
     b::Ptr{Cdouble}
     h::Ptr{Cdouble}
+
+    # equilibration vector
+    xequil::Ptr{Cdouble}
+    Aequil::Ptr{Cdouble}
+    Gequil::Ptr{Cdouble}
+
     # scalings of problem data
     resx0::Cdouble
     resy0::Cdouble
     resz0::Cdouble
+
     # residuals
     rx::Ptr{Cdouble}
     ry::Ptr{Cdouble}
@@ -165,21 +191,25 @@ immutable Cpwork
     hresx::Cdouble
     hresy::Cdouble
     hresz::Cdouble
-    # temporary storage 
+
+    # temporary storage
     cx::Cdouble
     by::Cdouble
     hz::Cdouble
     sz::Cdouble
+
     # KKT System
     KKT::Ptr{Ckkt}
+
     # info struct
     info::Ptr{Cstats}
+
     # settings struct
     stgs::Ptr{Csettings}
 end
 
 
-# ECOS types: 
+# ECOS types:
 # pfloat -> Cdouble
 # idxint -> SuiteSparse_long -> Clong
 
@@ -190,18 +220,71 @@ end
 # l is the dimension of the positive orthant, i.e. in Gx+s=h, s in K, the first l elements of s are >=0
 # ncones is the number of second-order cones present in K
 # q is an array of integers of length ncones, where each element defines the dimension of the cone
-# Gpr, Gjc, Gir are the the data, the column index, and the row index arrays, respectively, for the matrix G represented in column compressed storage (CCS) format (Google it if you need more information on this format, it is one of the standard sparse matrix representations)
+# Gpr, Gjc, Gir are the the data, the column index, and the row index arrays, respectively,
+# for the matrix G represented in column compressed storage (CCS) format (Google it if you need more
+# information on this format, it is one of the standard sparse matrix representations)
 # Apr, Ajc, Air is the CCS representation of the matrix A (can be all NULL if no equalities are present)
 # c is an array of type pfloat of size n
 # h is an array of type pfloat of size m
-
-# b is an array of type pfloat of size p (can be NULL if no equalities are present) The setup function returns a struct of type pwork, which you need to define first
-
-
+# b is an array of type pfloat of size p (can be NULL if no equalities are present)
+# The setup function returns a struct of type pwork, which you need to define first
 # This is the straightforward translation from the C API.
-# TODO: allow the matrix to be a Julia SparseMatrixCSC instead
-function setup(n::Int64, m::Int64, p::Int64, l::Int64, ncones::Int64, q::Array{Int64}, Gpr::Array{Float64}, Gjc::Array{Int64}, Gir::Array{Int64}, Apr::Array{Float64}, Ajc::Array{Int64}, Air::Array{Int64}, c::Array{Float64}, h::Array{Float64}, b::Array{Float64})
+function setup(n::Int64, m::Int64, p::Int64, l::Int64, ncones::Int64, q::Array{Int64},
+        Gpr::Array{Float64}, Gjc::Array{Int64}, Gir::Array{Int64}, Apr::Array{Float64},
+        Ajc::Array{Int64}, Air::Array{Int64}, c::Array{Float64}, h::Array{Float64},
+        b::Array{Float64})
     problem = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork}, (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}), n, m, p, l, ncones, q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
+end
+
+VecOrMatOrSparseOrNothing = Union(Vector, Matrix, SparseMatrixCSC, Nothing)
+ArrayFloat64OrNothing = Union(Array{Float64, }, Nothing)
+
+function setup(;n::Int64=nothing, m::Int64=nothing, p::Int64=0, l::Int64=0,
+        ncones::Int64=0, q::Array{Int64, }=[], G::VecOrMatOrSparseOrNothing=nothing,
+        A::VecOrMatOrSparseOrNothing=nothing, c::Array{Float64, }=nothing,
+        h::ArrayFloat64OrNothing=nothing, b::ArrayFloat64OrNothing=nothing)
+    if q == []
+        q = convert(Ptr{Int64}, C_NULL)
+    end
+
+    if A == nothing
+        Apr = convert(Ptr{Float64}, C_NULL)
+        Ajc = convert(Ptr{Int64}, C_NULL)
+        Air = convert(Ptr{Int64}, C_NULL)
+    else
+        sparseA = sparse(A)
+        # Hack to make it a float, find a better way
+        Apr = sparseA.nzval * 1.0
+        # -1 since the C language is 0 indexed
+        Ajc = sparseA.colptr - 1
+        Air = sparseA.rowval - 1
+    end
+
+    if G == nothing
+        Gpr = convert(Ptr{Float64}, C_NULL)
+        Gjc = convert(Ptr{Int64}, C_NULL)
+        Gir = convert(Ptr{Int64}, C_NULL)
+    else
+        sparseG = sparse(G)
+        # Hack to make it a float, find a better way
+        Gpr = sparseG.nzval * 1.0
+        # -1 since the C language is 0 indexed
+        Gjc = sparseG.colptr - 1
+        Gir = sparseG.rowval - 1
+    end
+
+    if b == nothing
+        b = convert(Ptr{Float64}, C_NULL)
+    end
+
+    if h == nothing
+        h = convert(Ptr{Float64}, C_NULL)
+    end
+
+    ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork}, (Clong, Clong, Clong, Clong, Clong,
+            Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong},
+            Ptr{Clong}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}), n, m, p, l, ncones,
+            q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
 end
 
 function solve(problem::Ptr{Cpwork})

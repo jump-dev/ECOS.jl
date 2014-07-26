@@ -63,6 +63,30 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
     (nvar = length(collb)) == length(colub) || error("Unequal lengths for column bounds")
     (nrow = length(rowlb)) == length(rowub) || error("Unequal lengths for row bounds")
     
+    # Turn variable bounds into constraints
+    # Inefficient, because keeps allocating memory!
+    # Would need to batch, get tricky...
+    for j = 1:nvar
+        if collb[j] != -Inf
+            # Variable has lower bound
+            newrow = zeros(1, nvar)
+            newrow[j] = -1.0
+            A = vcat(A, newrow)
+            rowlb = vcat(rowlb, -Inf)
+            rowub = vcat(rowub, -collb[j])
+            nrow += 1
+        end
+        if colub[j] != +Inf
+            # Variable has upper bound
+            newrow = zeros(1, nvar)
+            newrow[j] = 1.0
+            A = vcat(A, newrow)
+            rowlb = vcat(rowlb, -Inf)
+            rowub = vcat(rowub, colub[j])
+            nrow += 1
+        end
+    end
+
     eqidx   = Int[]      # Equality row indicies
     ineqidx = Int[]      # Inequality row indicies
     eqbnd   = Float64[]  # Bounds for equality rows
@@ -86,7 +110,6 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
             A[it,:] *= -1 # flip signs so we have Ax<=b
         end
     end
-
 
     m.nvar      = nvar                  # Number of variables
     m.nineq     = length(ineqidx)       # Number of inequalities Gx <=_K h

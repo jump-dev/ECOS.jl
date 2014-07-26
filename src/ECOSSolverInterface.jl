@@ -32,6 +32,7 @@ type ECOSMathProgModel <: AbstractMathProgModel
     # Post-solve
     solve_stat::Symbol
     obj_val::Float64
+    primal_sol::Vector{Float64}
 end
 ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         Int[],
@@ -39,7 +40,7 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         spzeros(0,0),
                                         Float64[], :Min,
                                         Float64[], Float64[],
-                                        :NotSolved, 0.0)
+                                        :NotSolved, 0.0, Float64[])
 
 #############################################################################
 # Begin implementation of the MPB interface
@@ -129,10 +130,13 @@ function optimize!(m::ECOSMathProgModel)
         m.solve_stat = :Error
     end
     # Extract solution
-    dump(ecos_prob_ptr)
     ecos_prob = unsafe_pointer_to_objref(ecos_prob_ptr)
     # Segfaults...
+    m.obj_val = 0.0  # ecos_prob.cx
+    m.primal_sol = zeros(m.nvar)  # ecos_prob.x
     cleanup(ecos_prob_ptr, 0)
 end
 
 status(m::ECOSMathProgModel) = m.solve_stat
+getobjval(m::ECOSMathProgModel) = m.obj_val
+getsolution(m::ECOSMathProgModel) = m.primal_sol

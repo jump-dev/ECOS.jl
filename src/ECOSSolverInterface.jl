@@ -119,7 +119,7 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
     m.conedims  = Int[]                 # ???
     m.G         = sparse(A[ineqidx,:])  # The G matrix (inequalties)
     m.A         = sparse(A[eqidx,:])    # The A matrix (equalities)
-    m.c         = (sense == :Max) ? obj * -1 : obj 
+    m.c         = (sense == :Max) ? obj * -1 : obj[:] 
                                         # The objective coeffs (always min)
     m.original_sense = sense            # Original objective sense
     m.h         = ineqbnd               # RHS for inequality 
@@ -136,7 +136,7 @@ function optimize!(m::ECOSMathProgModel)
         q       = m.conedims,
         G       = m.G,
         A       = m.A,
-        c       = m.c,
+        c       = m.c[:],  # Seems to modify this
         h       = m.h,
         b       = m.b)
 
@@ -153,10 +153,9 @@ function optimize!(m::ECOSMathProgModel)
         m.solve_stat = :Error
     end
     # Extract solution
-    ecos_prob = unsafe_pointer_to_objref(ecos_prob_ptr)
-    # Segfaults...
-    m.obj_val = 0.0  # ecos_prob.cx
-    m.primal_sol = zeros(m.nvar)  # ecos_prob.x
+    ecos_prob = pointer_to_array(ecos_prob_ptr, 1)[1]
+    m.primal_sol = pointer_to_array(ecos_prob.x, m.nvar)[:]
+    m.obj_val = dot(m.c, m.primal_sol) * (m.original_sense == :Max ? -1 : +1)  
     cleanup(ecos_prob_ptr, 0)
 end
 

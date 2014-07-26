@@ -98,7 +98,7 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
             push!(eqbnd, rowlb[it])
         # Range constraint - not supported
         elseif rowlb[it] != -Inf && rowub[it] != Inf
-            error("Not yet support for ranged constraints")
+            error("Ranged constraints unsupported!")
         # Less-than constraint
         elseif rowlb[it] == -Inf
             push!(ineqidx, it)

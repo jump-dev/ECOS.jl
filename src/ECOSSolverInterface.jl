@@ -43,14 +43,13 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         :NotSolved, 0.0, Float64[])
 
 #############################################################################
-# Begin implementation of the MPB interface
+# Begin implementation of the MPB low-level interface 
 # Implements
 # - model
 # - loadproblem!
 # - optimize!
 # - status
 # http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
-# http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
 model(s::ECOSSolver) = ECOSMathProgModel()
 
@@ -162,3 +161,42 @@ end
 status(m::ECOSMathProgModel) = m.solve_stat
 getobjval(m::ECOSMathProgModel) = m.obj_val
 getsolution(m::ECOSMathProgModel) = m.primal_sol
+
+#############################################################################
+# Begin implementation of the MPB conic interface 
+# Implements
+# - loadconicproblem!
+# http://mathprogbasejl.readthedocs.org/en/latest/conic.html
+
+function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
+    # We don't support SOCRotated, SDP, or Exp*
+    bad_cones = [:SOCRotated, :SDP, :ExpPrimal, :ExpDual]
+    for cone in cones
+        cone in bad_cones && error("Cone type $cone not supported")
+    end
+
+    # MathProgBase form             ECOS form
+    # min c'x                       min c'x
+    # st  A x = b                   st  A x = b
+    #       x in K                      h - Gx in K
+
+    # Starting small, implementing incrementally
+    for cone in cones
+        if cone != :NonNeg
+            error("Cone type $cone not implemented yet")
+        end
+    end
+
+    m.nvar      = length(cones)
+    m.nineq     = length(cones)
+    m.neq       = length(b)
+    m.npos      = length(cones)
+    m.ncones    = 0
+    m.conedims  = Int[]
+    m.G         = -eye(length(cones))
+    m.A         = sparse(A)
+    m.c         = c
+    m.original_sense = :Min
+    m.h         = zeros(length(b))
+    m.b         = b
+end

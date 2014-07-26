@@ -8,7 +8,8 @@
 #############################################################################
 
 tests = ["direct.jl",
-         "mpb.jl"]
+         "mpb.jl",
+         "mpb_conic.jl"]
 
 println("Running tests:")
 

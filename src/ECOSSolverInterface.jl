@@ -180,23 +180,53 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     # st  A x = b                   st  A x = b
     #       x in K                      h - Gx in K
 
-    # Starting small, implementing incrementally
-    for cone in cones
-        if cone != :NonNeg
-            error("Cone type $cone not implemented yet")
+    n_cone = length(cones)
+
+    # Start with the data provided
+    ecos_c = copy(c)
+    ecos_A = copy(A)
+    ecos_b = copy(b)
+
+    # CONE :Zero
+    # For all variables in the zero cone, fix at 0 with an
+    # equality constraint.
+    # TODO: Don't even include them
+    for j = 1:n_cone
+        if cones[j] == :Zero
+            new_row = zeros(1,n_cone)
+            new_row[j] = 1.0
+            ecos_A = vcat(ecos_A, new_row)
+            ecos_b = vcat(ecos_b, 0.0)
         end
     end
 
-    m.nvar      = length(cones)
-    m.nineq     = length(cones)
-    m.neq       = length(b)
-    m.npos      = length(cones)
+    # Build G matrix
+    ecos_G = Array(Float64,0,n_cone)
+    ecos_h = Array(Float64,0)
+    for j = 1:n_cone
+        if cones[j] == :NonNeg
+            new_row = zeros(1,n_cone)
+            new_row[j] = -1.0
+            ecos_G = vcat(ecos_G, new_row)
+            ecos_h = vcat(ecos_h, 0.0)
+        elseif cones[j] == :NonPos
+            new_row = zeros(1,n_cone)
+            new_row[j] = +1.0
+            ecos_G = vcat(ecos_G, new_row)
+            ecos_h = vcat(ecos_h, 0.0)
+        end
+    end
+
+    m.nvar      = n_cone
+    m.nineq     = length(ecos_h)
+    m.neq       = length(ecos_b)
+    m.npos      = length(ecos_h)
     m.ncones    = 0
     m.conedims  = Int[]
-    m.G         = -eye(length(cones))
-    m.A         = sparse(A)
-    m.c         = c
+    m.G         = ecos_G
+    m.A         = ecos_A
+    m.c         = ecos_c
     m.original_sense = :Min
-    m.h         = zeros(length(b))
-    m.b         = b
+    m.h         = ecos_h
+    m.b         = ecos_b
 end

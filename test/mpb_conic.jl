@@ -13,22 +13,50 @@ using ECOS
 
 s = ECOSSolver()
 
-# Problem 1
+# Problem 1 - all vars in nonneg cone
 # min -3x - 2y - 4z
-# st    x +  y +  z <= 3
-#            y +  z <= 2
+# st    x +  y +  z == 3
+#            y +  z == 2
 #       x>=0 y>=0 z>=0
 # Opt solution = -11
 # x = 1, y = 0, z = 2
 m = MathProgBase.model(s)
-ECOS.loadconicproblem!(m, [-3.0, -2.0, -4.0],
-                     [ 1.0   1.0   1.0;
-                       0.0   1.0   1.0],
-                     [ 3.0,  2.0],
-                     [:NonNeg, :NonNeg, :NonNeg])
+ECOS.loadconicproblem!(m, 
+                    [-3.0, -2.0, -4.0],
+                    [ 1.0   1.0   1.0;
+                      0.0   1.0   1.0],
+                    [ 3.0,  2.0],
+                    [:NonNeg, :NonNeg, :NonNeg])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal
 @test_approx_eq_eps MathProgBase.getobjval(m) -11 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[1] 1.0 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[2] 0.0 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[3] 2.0 1e-6
+
+# Problem 2 - mixed free, nonneg, nonpos, zero
+# min  3x + 2y - 4z + 0s
+# st    x           -  s  == -4    (i.e. x >= -4)
+#            y            == -3
+#       x      +  z       == 12
+#       x free
+#       y <= 0
+#       z >= 0
+#       s zero
+# Opt solution = -82
+# x = -4, y = -3, z = 16, s == 0
+m = MathProgBase.model(s)
+ECOS.loadconicproblem!(m,
+                    [ 3.0,  2.0, -4.0,  0.0],
+                    [ 1.0   0.0   0.0  -1.0;
+                      0.0   1.0   0.0   0.0;
+                      1.0   0.0   1.0   0.0],
+                    [-4.0, -3.0, 12.0],
+                    [:Free, :NonPos, :NonNeg, :Zero])
+MathProgBase.optimize!(m)
+@test MathProgBase.status(m) == :Optimal
+@test_approx_eq_eps MathProgBase.getobjval(m) -82 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[1] -4.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[2] -3.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[3] 16.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[4]  0.0 1e-6

@@ -29,7 +29,9 @@ type ECOSMathProgModel <: AbstractMathProgModel
     original_sense::Symbol              # Original objective sense
     h::Vector{Float64}                  # RHS for inequality 
     b::Vector{Float64}                  # RHS for equality
-    solve_stat::Symbol                  # Status after solving
+    # Post-solve
+    solve_stat::Symbol
+    obj_val::Float64
 end
 ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         Int[],
@@ -37,7 +39,7 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         spzeros(0,0),
                                         Float64[], :Min,
                                         Float64[], Float64[],
-                                        :NotSolved)
+                                        :NotSolved, 0.0)
 
 #############################################################################
 # Begin implementation of the MPB interface
@@ -101,7 +103,7 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
 end
 
 function optimize!(m::ECOSMathProgModel)
-    ecos_prob = setup(
+    ecos_prob_ptr = setup(
         n       = m.nvar,
         m       = m.nineq,
         p       = m.neq,
@@ -113,7 +115,8 @@ function optimize!(m::ECOSMathProgModel)
         c       = m.c,
         h       = m.h,
         b       = m.b)
-    flag = solve(ecos_prob)
+
+    flag = solve(ecos_prob_ptr)
     if flag == ECOS_OPTIMAL
         m.solve_stat = :Optimal
     elseif flag == ECOS_PINF
@@ -125,7 +128,11 @@ function optimize!(m::ECOSMathProgModel)
     else
         m.solve_stat = :Error
     end
-    cleanup(ecos_prob, 0)
+    # Extract solution
+    dump(ecos_prob_ptr)
+    ecos_prob = unsafe_pointer_to_objref(ecos_prob_ptr)
+    # Segfaults...
+    cleanup(ecos_prob_ptr, 0)
 end
 
 status(m::ECOSMathProgModel) = m.solve_stat

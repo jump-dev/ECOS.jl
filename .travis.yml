@@ -14,4 +14,7 @@ before_install:
   - sudo apt-get install libpcre3-dev julia -y
 script:
   - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir("ECOS"))`); Pkg.pin("ECOS"); Pkg.resolve(); Pkg.build("ECOS")'
-  - julia -e 'using ECOS; @assert isdefined(:ECOS); @assert typeof(ECOS) === Module'
+  - if [ $JULIAVERSION = "julianightlies" ]; then julia --code-coverage test/runtests.jl; fi
+  - if [ $JULIAVERSION = "juliareleases" ]; then julia test/runtests.jl; fi
+after_success:
+  - if [ $JULIAVERSION = "julianightlies" ]; julia -e 'cd(Pkg.dir("ECOS")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'; fi

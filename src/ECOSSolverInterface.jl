@@ -41,12 +41,15 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
 
 #############################################################################
 # Begin implementation of the MPB interface
+# Implements
+# - model
+# - loadproblem!
+# - optimize!
+# - status
 # http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
 model(s::ECOSSolver) = ECOSMathProgModel()
-
-# Not Imp: loadproblem!(m, filename)
 
 # Loads the provided problem data to set up the linear programming problem:
 # min c'x
@@ -111,5 +114,18 @@ function optimize!(m::ECOSMathProgModel)
         h       = m.h,
         b       = m.b)
     flag = solve(ecos_prob)
+    if flag == ECOS_OPTIMAL
+        m.solve_stat = :Optimal
+    elseif flag == ECOS_PINF
+        m.solve_stat = :Infeasible
+    elseif flag == ECOS_DINF  # Dual infeasible = primal unbounded, probably
+        m.solve_stat = :Unbounded
+    elseif flag == ECOS_MAXIT
+        m.solve_stat = :UserLimit
+    else
+        m.solve_stat = :Error
+    end
     cleanup(ecos_prob, 0)
 end
+
+status(m::ECOSMathProgModel) = m.solve_stat

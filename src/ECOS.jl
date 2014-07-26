@@ -1,3 +1,12 @@
+#############################################################################
+# ECOS.jl
+# Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
+# See http://github.com/JuliaOpt/ECOS.jl
+#############################################################################
+# ECOS.jl
+# Contains the wrapper itself
+#############################################################################
+
 module ECOS
 
 if isfile(joinpath(Pkg.dir("ECOS"),"deps","deps.jl"))
@@ -232,21 +241,22 @@ end
 # b is an array of type pfloat of size p (can be NULL if no equalities are present)
 # The setup function returns a struct of type pwork, which you need to define first
 # This is the straightforward translation from the C API.
-function setup(n::Int64, m::Int64, p::Int64, l::Int64, ncones::Int64, q::Array{Int64},
-        Gpr::Array{Float64}, Gjc::Array{Int64}, Gir::Array{Int64}, Apr::Array{Float64},
-        Ajc::Array{Int64}, Air::Array{Int64}, c::Array{Float64}, h::Array{Float64},
-        b::Array{Float64})
+function setup(n::Int64, m::Int64, p::Int64, l::Int64, ncones::Int64, q::Vector{Int64},
+        Gpr::Vector{Float64}, Gjc::Vector{Int64}, Gir::Vector{Int64}, Apr::Vector{Float64},
+        Ajc::Vector{Int64}, Air::Vector{Int64}, c::Vector{Float64}, h::Vector{Float64},
+        b::Vector{Float64})
     problem = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork}, (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}), n, m, p, l, ncones, q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
 end
 
 VecOrMatOrSparseOrNothing = Union(Vector, Matrix, SparseMatrixCSC, Nothing)
-ArrayFloat64OrNothing = Union(Array{Float64, }, Nothing)
+ArrayFloat64OrNothing = Union(Vector{Float64}, Nothing)
 
 function setup(;n::Int64=nothing, m::Int64=nothing, p::Int64=0, l::Int64=0,
-        ncones::Int64=0, q::Array{Int64, }=[], G::VecOrMatOrSparseOrNothing=nothing,
-        A::VecOrMatOrSparseOrNothing=nothing, c::Array{Float64, }=nothing,
+        ncones::Int64=0, q::Vector{Int64}=Int64[], G::VecOrMatOrSparseOrNothing=nothing,
+        A::VecOrMatOrSparseOrNothing=nothing, c::Vector{Float64}=nothing,
         h::ArrayFloat64OrNothing=nothing, b::ArrayFloat64OrNothing=nothing)
-    if q == []
+    
+    if length(q) == 0
         q = convert(Ptr{Int64}, C_NULL)
     end
 

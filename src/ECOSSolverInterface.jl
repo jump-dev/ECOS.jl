@@ -1,92 +1,115 @@
-export ECOSSolver
+#############################################################################
+# ECOS.jl
+# Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
+# See http://github.com/JuliaOpt/ECOS.jl
+#############################################################################
+# ECOSSolverInterface.jl
+# MathProgBase.jl interface for the ECOS.jl solver wrapper
+#############################################################################
 
-type ECOSMathProgModel <: AbstractMathProgModel
-    nvar::Int
-    nineq::Int
-    neq::Int
-    npos::Int
-    ncones::Int
-    conedims::Vector{Int}
-    G::SparseMatrixCSC{Float64,Int}
-    A::SparseMatrixCSC{Float64,Int}
-    c::Vector{Float64}
-    sense::Symbol
-    h::Vector{Float64}
-    b::Vector{Float64}
-    solve_stat::Symbol
+require(joinpath(Pkg.dir("MathProgBase"),"src","MathProgSolverInterface.jl"))
+importall MathProgSolverInterface
+
+#############################################################################
+# Define the MPB Solver and Model objects
+export ECOSSolver
+immutable ECOSSolver <: AbstractMathProgSolver
 end
 
-ECOSMathProgModel() = ECOSMathProgModel(0,
-                                        0,
-                                        0,
-                                        0,
-                                        0,
+type ECOSMathProgModel <: AbstractMathProgModel
+    nvar::Int                           # Number of variables
+    nineq::Int                          # Number of inequalities Gx <=_K h
+    neq::Int                            # Number of equalities Ax = b
+    npos::Int                           # Number of ???
+    ncones::Int                         # Number of SO cones
+    conedims::Vector{Int}               # ?
+    G::SparseMatrixCSC{Float64,Int}     # The G matrix (inequalties)
+    A::SparseMatrixCSC{Float64,Int}     # The A matrix (equalities)
+    c::Vector{Float64}                  # The objective coeffs (always min)
+    original_sense::Symbol              # Original objective sense
+    h::Vector{Float64}                  # RHS for inequality 
+    b::Vector{Float64}                  # RHS for equality
+    solve_stat::Symbol                  # Status after solving
+end
+ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         Int[],
-                                        spzeros(0),
-                                        spzeros(0),
-                                        Float64[],
-                                        Float64[],
+                                        spzeros(0,0),
+                                        spzeros(0,0),
+                                        Float64[], :Min,
+                                        Float64[], Float64[],
                                         :NotSolved)
 
-immutable ECOSSolver <: AbstractMathProgSolver
+#############################################################################
+# Begin implementation of the MPB interface
+# http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
+# http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
+model(s::ECOSSolver) = ECOSMathProgModel()
+
+# Not Imp: loadproblem!(m, filename)
+
+# Loads the provided problem data to set up the linear programming problem:
+# min c'x
+# st  lb <= Ax <= ub
+#      l <=  x <= u
+# where sense = :Min or :Max
 function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
     (nvar = length(collb)) == length(colub) || error("Unequal lengths for column bounds")
-    (nrow = length(rowlb)) == length(rowub) || "Unequal lengths for row bounds"
-    sense == :Max && (obj *= -1)
-    eqidx = Int[]
-    ineqidx = Int[]
-    eqbnd = Float64[]
-    ineqbnd = Float64[]
+    (nrow = length(rowlb)) == length(rowub) || error("Unequal lengths for row bounds")
+    
+    eqidx   = Int[]      # Equality row indicies
+    ineqidx = Int[]      # Inequality row indicies
+    eqbnd   = Float64[]  # Bounds for equality rows
+    ineqbnd = Float64[]  # Bounds for inequality row
     for it in 1:nrow
+        # Equality constraint
         if rowlb[it] == rowub[it]
             push!(eqidx, it)
             push!(eqbnd, rowlb[it])
-        elseif rowlb[it] != -Inf && rowub != Inf
+        # Range constraint - not supported
+        elseif rowlb[it] != -Inf && rowub[it] != Inf
             error("Not yet support for ranged constraints")
+        # Less-than constraint
         elseif rowlb[it] == -Inf
             push!(ineqidx, it)
             push!(ineqbnd, rowub[it])
+        # Greater-than constraint - flip sign so only have <= constraints
         else
             push!(ineqidx, it)
             push!(ineqbnd, -rowlb[it])
             A[it,:] *= -1 # flip signs so we have Ax<=b
         end
     end
-    ncones = 0
-    conedims = Int[]
-    m = ECOSMathProgModel(nvar,
-                          length(ineqidx),
-                          length(eqidx),
-                          length(ineqidx), # not sure about this...
-                          0,
-                          Int[],
-                          sparse(A[eqidx,:]), # much less efficient than desirable
-                          sparse(A[ineqidx,:]),
-                          obj,
-                          sense,
-                          ineqbnd,
-                          eqbnd,
-                          :NotSolved)
-    nothing
+
+
+    m.nvar      = nvar                  # Number of variables
+    m.nineq     = length(ineqidx)       # Number of inequalities Gx <=_K h
+    m.neq       = length(eqidx)         # Number of equalities Ax = b
+    m.npos      = length(ineqidx)       # Number of ???
+    m.ncones    = 0                     # Number of SO cones
+    m.conedims  = Int[]                 # ???
+    m.G         = sparse(A[ineqidx,:])  # The G matrix (inequalties)
+    m.A         = sparse(A[eqidx,:])    # The A matrix (equalities)
+    m.c         = (sense == :Max) ? obj * -1 : obj 
+                                        # The objective coeffs (always min)
+    m.original_sense = sense            # Original objective sense
+    m.h         = ineqbnd               # RHS for inequality 
+    m.b         = eqbnd                 # RHS for equality
 end
 
 function optimize!(m::ECOSMathProgModel)
-    A = CSCtoCCS(m.A)
-    G = CSCtoCCS(m.G)
-    problem = setup(m.nvar,
-                    m.nineq,
-                    m.neq,
-                    m.npos,
-                    m.ncones,
-                    m.conedims,
-                    G,
-                    A,
-                    m.c,
-                    m.h,
-                    m.b)
-
-    m.solve_stat = solve(problem)
-    cleanup(problem, 1)
-    nothing
+    ecos_prob = setup(
+        n       = m.nvar,
+        m       = m.nineq,
+        p       = m.neq,
+        l       = m.npos,
+        ncones  = m.ncones,
+        q       = m.conedims,
+        G       = m.G,
+        A       = m.A,
+        c       = m.c,
+        h       = m.h,
+        b       = m.b)
+    flag = solve(ecos_prob)
+    cleanup(ecos_prob, 0)
 end

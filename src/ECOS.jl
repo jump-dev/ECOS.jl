@@ -6,6 +6,9 @@ else
     error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")
 end
 
+include("ECOSSolverInterface.jl")
+
+
 macro ecos_ccall(func, args...)
     f = "ECOS_$(func)"
     quote

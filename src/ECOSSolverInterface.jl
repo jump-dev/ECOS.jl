@@ -171,8 +171,8 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol
 function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     # We don't support SOCRotated, SDP, or Exp*
     bad_cones = [:SOCRotated, :SDP, :ExpPrimal, :ExpDual]
-    for cone in cones
-        cone in bad_cones && error("Cone type $cone not supported")
+    for cone_vars in cones
+        cone_vars[1] in bad_cones && error("Cone type $(cone_vars[1]) not supported")
     end
 
     # MathProgBase form             ECOS form
@@ -180,7 +180,21 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     # st  A x = b                   st  A x = b
     #       x in K                      h - Gx in K
 
-    n_cone = length(cones)
+    # Expand out the cones info
+    # TODO: Don't assume sorted
+    expand_cones = Symbol[]
+    for cone_vars in cones
+        cone_type, idxs = cone_vars
+        if isa(idxs, Int)
+            push!(expand_cones, cone_type)
+        else 
+            # Assume its iterable
+            for i in idxs
+                push!(expand_cones, cone_type)
+            end
+        end
+    end
+    nvar = length(expand_cones)
 
     # Start with the data provided
     ecos_c = copy(c)
@@ -191,9 +205,9 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     # For all variables in the zero cone, fix at 0 with an
     # equality constraint.
     # TODO: Don't even include them
-    for j = 1:n_cone
-        if cones[j] == :Zero
-            new_row = zeros(1,n_cone)
+    for j = 1:nvar
+        if expand_cones[j] == :Zero
+            new_row = zeros(1,nvar)
             new_row[j] = 1.0
             ecos_A = vcat(ecos_A, new_row)
             ecos_b = vcat(ecos_b, 0.0)
@@ -201,23 +215,23 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     end
 
     # Build G matrix
-    ecos_G = Array(Float64,0,n_cone)
+    ecos_G = Array(Float64,0,nvar)
     ecos_h = Array(Float64,0)
-    for j = 1:n_cone
-        if cones[j] == :NonNeg
-            new_row = zeros(1,n_cone)
+    for j = 1:nvar
+        if expand_cones[j] == :NonNeg
+            new_row = zeros(1,nvar)
             new_row[j] = -1.0
             ecos_G = vcat(ecos_G, new_row)
             ecos_h = vcat(ecos_h, 0.0)
-        elseif cones[j] == :NonPos
-            new_row = zeros(1,n_cone)
+        elseif expand_cones[j] == :NonPos
+            new_row = zeros(1,nvar)
             new_row[j] = +1.0
             ecos_G = vcat(ecos_G, new_row)
             ecos_h = vcat(ecos_h, 0.0)
         end
     end
 
-    m.nvar      = n_cone
+    m.nvar      = nvar
     m.nineq     = length(ecos_h)
     m.neq       = length(ecos_b)
     m.npos      = length(ecos_h)

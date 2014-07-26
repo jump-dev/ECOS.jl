@@ -26,7 +26,7 @@ ECOS.loadconicproblem!(m,
                     [ 1.0   1.0   1.0;
                       0.0   1.0   1.0],
                     [ 3.0,  2.0],
-                    [:NonNeg, :NonNeg, :NonNeg])
+                    [(:NonNeg, 1:3)])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal
 @test_approx_eq_eps MathProgBase.getobjval(m) -11 1e-6
@@ -52,7 +52,7 @@ ECOS.loadconicproblem!(m,
                       0.0   1.0   0.0   0.0;
                       1.0   0.0   1.0   0.0],
                     [-4.0, -3.0, 12.0],
-                    [:Free, :NonPos, :NonNeg, :Zero])
+                    [(:Free,1), (:NonPos,2), (:NonNeg,3), (:Zero,4)])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal
 @test_approx_eq_eps MathProgBase.getobjval(m) -82 1e-6

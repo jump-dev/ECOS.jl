@@ -8,7 +8,7 @@
 #############################################################################
 
 using Base.Test
-import MathProgBase
+importall MathProgBase
 using ECOS
 
 s = ECOSSolver()
@@ -60,3 +60,20 @@ MathProgBase.optimize!(m)
 @test_approx_eq_eps MathProgBase.getsolution(m)[2] -3.0 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[3] 16.0 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[4]  0.0 1e-6
+
+# Problem 3 - SOC
+# min 0x - 1y - 1z
+#  st  x            == 1
+#      x >= ||(y,z)||
+m = MathProgBase.model(s)
+ECOS.loadconicproblem!(m,
+                    [ 0.0, -1.0, -1.0],
+                    [ 1.0   0.0   0.0],
+                    [ 1.0],
+                    [(:SOC,1:3)])
+MathProgBase.optimize!(m)
+@test MathProgBase.status(m) == :Optimal
+@test_approx_eq_eps MathProgBase.getobjval(m) -sqrt(2.0) 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[1] 1.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[2] 1.0/sqrt(2.0) 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[3] 1.0/sqrt(2.0) 1e-6

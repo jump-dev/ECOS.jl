@@ -201,8 +201,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     ecos_A = copy(A)
     ecos_b = copy(b)
 
-    # CONE :Zero
-    # For all variables in the zero cone, fix at 0 with an
+    # For all variables in the :Zero cone, fix at 0 with an
     # equality constraint.
     # TODO: Don't even include them
     for j = 1:nvar
@@ -217,26 +216,52 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     # Build G matrix
     ecos_G = Array(Float64,0,nvar)
     ecos_h = Array(Float64,0)
+    # First, handle the :NonNeg, :NonPos cases
+    npos = 0
     for j = 1:nvar
         if expand_cones[j] == :NonNeg
             new_row = zeros(1,nvar)
             new_row[j] = -1.0
             ecos_G = vcat(ecos_G, new_row)
             ecos_h = vcat(ecos_h, 0.0)
+            npos += 1
         elseif expand_cones[j] == :NonPos
             new_row = zeros(1,nvar)
             new_row[j] = +1.0
             ecos_G = vcat(ecos_G, new_row)
             ecos_h = vcat(ecos_h, 0.0)
+            npos += 1
         end
+    end
+    # Now handle the SOCs
+    # Input form is basically just says
+    # || x || <= y
+    # and we pass into ECOS
+    # 0 - Ix \in Q
+    # which maps back to the same thing
+    ncones = 0
+    conedims = Int[]
+    for cone_vars in cones
+        cone_type, idxs = cone_vars
+        cone_type != :SOC && continue
+        ncones += 1
+        push!(conedims, length(idxs))
+        new_rows = zeros(length(idxs),nvar)
+        row = 1
+        for j in idxs
+            new_rows[row,j] = -1.0
+            row += 1
+            ecos_h = vcat(ecos_h, 0.0)
+        end
+        ecos_G = vcat(ecos_G, new_rows)
     end
 
     m.nvar      = nvar
     m.nineq     = length(ecos_h)
     m.neq       = length(ecos_b)
-    m.npos      = length(ecos_h)
-    m.ncones    = 0
-    m.conedims  = Int[]
+    m.npos      = npos
+    m.ncones    = ncones
+    m.conedims  = conedims
     m.G         = ecos_G
     m.A         = ecos_A
     m.c         = ecos_c

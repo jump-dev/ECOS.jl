@@ -21,7 +21,7 @@ s = ECOSSolver()
 # Opt solution = -11
 # x = 1, y = 0, z = 2
 m = MathProgBase.model(s)
-ECOS.loadconicproblem!(m, 
+MathProgBase.loadconicproblem!(m, 
                     [-3.0, -2.0, -4.0],
                     [ 1.0   1.0   1.0;
                       0.0   1.0   1.0],
@@ -46,7 +46,7 @@ MathProgBase.optimize!(m)
 # Opt solution = -82
 # x = -4, y = -3, z = 16, s == 0
 m = MathProgBase.model(s)
-ECOS.loadconicproblem!(m,
+MathProgBase.loadconicproblem!(m,
                     [ 3.0,  2.0, -4.0,  0.0],
                     [ 1.0   0.0   0.0  -1.0;
                       0.0   1.0   0.0   0.0;
@@ -66,7 +66,7 @@ MathProgBase.optimize!(m)
 #  st  x            == 1
 #      x >= ||(y,z)||
 m = MathProgBase.model(s)
-ECOS.loadconicproblem!(m,
+MathProgBase.loadconicproblem!(m,
                     [ 0.0, -1.0, -1.0],
                     [ 1.0   0.0   0.0],
                     [ 1.0],

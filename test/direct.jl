@@ -1,5 +1,16 @@
+#############################################################################
+# ECOS.jl
+# Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
+# See http://github.com/JuliaOpt/ECOS.jl
+#############################################################################
+# test/direct.jl
+# Test the direct interface for the ECOS.jl solver wrapper
+#############################################################################
+
 # The values below are copied from data.h in ECOS source code
 import ECOS
+
+println(ECOS.ver())
 
 n = 223
 m = 220
@@ -39,4 +50,4 @@ mywork = ECOS.setup(n, m, p, l, ncones, q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b
 exitflag = ECOS.solve(mywork)
 
 # Call after comparing values with correct values
-#ECOS.cleanup(mywork, 0)
+ECOS.cleanup(mywork, 0)

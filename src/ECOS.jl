@@ -1,5 +1,15 @@
+#############################################################################
+# ECOS.jl
+# Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
+# See http://github.com/JuliaOpt/ECOS.jl
+#############################################################################
+# ECOS.jl
+# Contains the wrapper itself
+#############################################################################
+
 module ECOS
 
+# Try to load the binary dependency
 if isfile(joinpath(Pkg.dir("ECOS"),"deps","deps.jl"))
     include("../deps/deps.jl")
 else
@@ -15,284 +25,119 @@ macro ecos_ccall(func, args...)
     end
 end
 
-immutable Clpcone
-    p::Clong
-    w::Ptr{Cdouble}
-    v::Ptr{Cdouble}
-    kkt_idx::Ptr{Clong}
+
+include("ECOSSolverInterface.jl")  # MathProgBase interface
+include("types.jl")  # All the types and constants defined in ecos.h
+
+export setup, solve, cleanup
+
+# setup  (direct interface)
+# Provide ECOS with a problem in the form
+# min c'x
+# st  A*x = b
+#     G*x in_K h, 
+#       or equivalently  h - G*x in K
+#       or equivalently  G*x + s = h, s in K
+# K is the product of R+ and multiple second-order cones, with the
+# positive orthant first.
+# Inputs:
+#   n       Number of variables == length(x)
+#   m       Number of inequality constraints == length(h)
+#   p       Number of equality constraints == length(b)  (can be 0)
+#   l       Dimension of the positive orthant, 
+#               i.e. the first l elements of s are >= 0
+#   ncones  Number of second-order cones present in K
+#   q       ncones-long vector of the length of the index sets of the SOCs
+#               e.g. cone 1 is indices 4:6, cone 2 is indices 7:10
+#                    ->  q = [3, 4]
+#   Gpr, Gjc, Gir
+#           Non-zeros, column indices, and the row index arrays, respectively,
+#           for the matrix G represented in column compressed storage (CCS) format
+#           which is equivalent to Julia's SparseMatrixCSC
+#   Apr, Ajc, Air
+#           Equivalent to above for the matrix A.
+#           Can be all nothing if no equalities are present.
+#   c       Objective coefficients, length(c) == n
+#   h       RHS for inequality constraints, length(h) == m
+#   b       RHS for equality constraints, length(b) == b (can be nothing)
+# Returns a pointer to the ECOS pwork structure (Cpwork in ECOS.jl). See
+# types.jl for more information.
+function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int},Nothing),
+                Gpr::Vector{Float64}, Gjc::Vector{Int}, Gir::Vector{Int},
+                Apr::Union(Vector{Float64},Nothing), Ajc::Union(Vector{Int},Nothing), Air::Union(Vector{Int},Nothing),
+                c::Vector{Float64}, h::Vector{Float64}, b::Union(Vector{Float64},Nothing))
+    # Convert to canonical forms
+    q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
+    Apr = (Apr == nothing) ? convert(Ptr{Cdouble}, C_NULL) : Apr
+    Ajc = (Ajc == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Ajc)
+    Air = (Air == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Air)
+    b = (b == nothing) ? convert(Ptr{Cdouble}, C_NULL) : b
+    problem = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork},
+        (Clong, Clong, Clong, Clong, Clong, Ptr{Clong},
+         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
+         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
+         Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}),
+        n, m, p, l, ncones, q,
+        Gpr, convert(Vector{Clong},Gjc), convert(Vector{Clong},Gir),
+        Apr, Ajc, Air,
+        c, h, b)
 end
 
-immutable Csocone
-    p::Clong
-    skbar::Ptr{Cdouble}
-    zkbar::Ptr{Cdouble}
-    a::Clong
-    d1::Clong
-    w::Cdouble
-    eta::Cdouble
-    eta_square::Cdouble
-    q::Ptr{Cdouble}
-    Didx::Ptr{Clong}
-    u0::Cdouble
-    u1::Cdouble
-    v1::Cdouble
-end
-
-immutable Ccone
-    lpcone::Ptr{Clpcone}
-    socone::Ptr{Csocone}
-    nsoc::Clong
-end
-
-immutable Cspmat
-    jc::Ptr{Clong}
-    ir::Ptr{Clong}
-    pr::Ptr{Cdouble}
-    n::Clong
-    m::Clong
-    nnz::Clong
-end
-
-immutable Ckkt
-    PKPt::Ptr{Cspmat}
-    L::Ptr{Cspmat}
-    D::Ptr{Cdouble}
-    work1::Ptr{Cdouble}
-    work2::Ptr{Cdouble}
-    work3::Ptr{Cdouble}
-    work4::Ptr{Cdouble}
-    work5::Ptr{Cdouble}
-    work6::Ptr{Cdouble}
-    RHS1::Ptr{Cdouble}
-    RHS2::Ptr{Cdouble}
-    dx1::Ptr{Cdouble}
-    dx2::Ptr{Cdouble}
-    dy1::Ptr{Cdouble}
-    dy2::Ptr{Cdouble}
-    dz1::Ptr{Cdouble}
-    dz2::Ptr{Cdouble}
-    P::Ptr{Clong}
-    Pinv::Ptr{Clong}
-    PK::Ptr{Clong}
-    Parent::Ptr{Clong}
-    Sign::Ptr{Clong}
-    Pattern::Ptr{Clong}
-    Flag::Ptr{Clong}
-    Lnz::Ptr{Clong}
-    delta::Cdouble
-end
-
-immutable Cstats
-    pcost::Cdouble
-    dcost::Cdouble
-    pres::Cdouble
-    dres::Cdouble
-    pinf::Cdouble
-    dinf::Cdouble
-    pinfres::Cdouble
-    dinfres::Cdouble
-    gap::Cdouble
-    relgap::Cdouble
-    sigma::Cdouble
-    mu::Cdouble
-    step::Cdouble
-    step_aff::Cdouble
-    kapovert::Cdouble
-    iter::Clong
-    nitref1::Clong
-    nitref2::Clong
-    nitref3::Clong
-    tsetup::Cdouble
-    tsolve::Cdouble
-    tfactor::Cdouble
-    tkktsolve::Cdouble
-    torder::Cdouble
-    tkktcreate::Cdouble
-    ttranspose::Cdouble
-    tperm::Cdouble
-    tfactor_t1::Cdouble
-    tfactor_t2::Cdouble
-end
-
-immutable Csettings
-    gamma::Cdouble
-    delta::Cdouble
-    eps::Cdouble
-    feastol::Cdouble
-    abstol::Cdouble
-    reltol::Cdouble
-    feastol_inacc::Cdouble
-    abstol_inacc::Cdouble
-    reltol_inacc::Cdouble
-    nitref::Clong
-    maxit::Clong
-    verbose::Clong
-end
-
-immutable Cpwork
-    # Dimensions
-    n::Clong
-    m::Clong
-    p::Clong
-    D::Clong
-
-    # Variables
-    x::Ptr{Cdouble}
-    y::Ptr{Cdouble}
-    z::Ptr{Cdouble}
-    s::Ptr{Cdouble}
-    lambda::Ptr{Cdouble}
-    kap::Cdouble
-    tau::Cdouble
-
-    # Best iterates seen so far
-    best_x::Ptr{Cdouble}
-    best_y::Ptr{Cdouble}
-    best_z::Ptr{Cdouble}
-    best_s::Ptr{Cdouble}
-    best_kap::Cdouble
-    best_tau::Cdouble
-    best_cx::Cdouble
-    best_by::Cdouble
-    best_hz::Cdouble
-    best_info::Ptr{Cstats}
-
-    # Temporary variables
-    dsaff::Ptr{Cdouble}
-    dzaff::Ptr{Cdouble}
-    W_times_dzaff::Ptr{Cdouble}
-    dsaff_by_W::Ptr{Cdouble}
-    saff::Ptr{Cdouble}
-    zaff::Ptr{Cdouble}
-
-    # Cone
-    C::Ptr{Ccone}
-    A::Ptr{Cspmat}
-    G::Ptr{Cspmat}
-    c::Ptr{Cdouble}
-    b::Ptr{Cdouble}
-    h::Ptr{Cdouble}
-
-    # equilibration vector
-    xequil::Ptr{Cdouble}
-    Aequil::Ptr{Cdouble}
-    Gequil::Ptr{Cdouble}
-
-    # scalings of problem data
-    resx0::Cdouble
-    resy0::Cdouble
-    resz0::Cdouble
-
-    # residuals
-    rx::Ptr{Cdouble}
-    ry::Ptr{Cdouble}
-    rz::Ptr{Cdouble}
-    rt::Cdouble
-    hresx::Cdouble
-    hresy::Cdouble
-    hresz::Cdouble
-
-    # temporary storage
-    cx::Cdouble
-    by::Cdouble
-    hz::Cdouble
-    sz::Cdouble
-
-    # KKT System
-    KKT::Ptr{Ckkt}
-
-    # info struct
-    info::Ptr{Cstats}
-
-    # settings struct
-    stgs::Ptr{Csettings}
-end
-
-
-# ECOS types:
-# pfloat -> Cdouble
-# idxint -> SuiteSparse_long -> Clong
-
-# parameters
-# n is the number of variables,
-# m is the number of inequality constraints (dimension 1 of the matrix G and the length of the vector h),
-# p is the number of equality constraints (can be 0)
-# l is the dimension of the positive orthant, i.e. in Gx+s=h, s in K, the first l elements of s are >=0
-# ncones is the number of second-order cones present in K
-# q is an array of integers of length ncones, where each element defines the dimension of the cone
-# Gpr, Gjc, Gir are the the data, the column index, and the row index arrays, respectively,
-# for the matrix G represented in column compressed storage (CCS) format (Google it if you need more
-# information on this format, it is one of the standard sparse matrix representations)
-# Apr, Ajc, Air is the CCS representation of the matrix A (can be all NULL if no equalities are present)
-# c is an array of type pfloat of size n
-# h is an array of type pfloat of size m
-# b is an array of type pfloat of size p (can be NULL if no equalities are present)
-# The setup function returns a struct of type pwork, which you need to define first
-# This is the straightforward translation from the C API.
-function setup(n::Int64, m::Int64, p::Int64, l::Int64, ncones::Int64, q::Array{Int64},
-        Gpr::Array{Float64}, Gjc::Array{Int64}, Gir::Array{Int64}, Apr::Array{Float64},
-        Ajc::Array{Int64}, Air::Array{Int64}, c::Array{Float64}, h::Array{Float64},
-        b::Array{Float64})
-    problem = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork}, (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}), n, m, p, l, ncones, q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
-end
-
-VecOrMatOrSparseOrNothing = Union(Vector, Matrix, SparseMatrixCSC, Nothing)
-ArrayFloat64OrNothing = Union(Array{Float64, }, Nothing)
-
-function setup(;n::Int64=nothing, m::Int64=nothing, p::Int64=0, l::Int64=0,
-        ncones::Int64=0, q::Array{Int64, }=[], G::VecOrMatOrSparseOrNothing=nothing,
-        A::VecOrMatOrSparseOrNothing=nothing, c::Array{Float64, }=nothing,
-        h::ArrayFloat64OrNothing=nothing, b::ArrayFloat64OrNothing=nothing)
-    if q == []
-        q = convert(Ptr{Int64}, C_NULL)
-    end
-
+# setup  (more general interface)
+# A more tolerant version of the above method that doesn't require
+# user to fiddle with internals of the sparse matrix format
+# User can pass nothing as argument for A, b, and q
+function setup(n, m, p, l, ncones, q, G, A, c, h, b)
     if A == nothing
-        Apr = convert(Ptr{Float64}, C_NULL)
-        Ajc = convert(Ptr{Int64}, C_NULL)
-        Air = convert(Ptr{Int64}, C_NULL)
+        if b != nothing
+            @assert length(b) == 0
+            b = nothing
+        end
+        @assert p == 0
+        Apr = nothing
+        Ajc = nothing
+        Air = nothing
     else
+        numrow, numcol = size(A)
+        @assert numcol == n
+        @assert numrow == length(b)
         sparseA = sparse(A)
-        # Hack to make it a float, find a better way
-        Apr = sparseA.nzval * 1.0
-        # -1 since the C language is 0 indexed
-        Ajc = sparseA.colptr - 1
+        Apr = convert(Vector{Float64}, sparseA.nzval)
+        Ajc = sparseA.colptr - 1  # C is 0-based
         Air = sparseA.rowval - 1
     end
 
-    if G == nothing
-        Gpr = convert(Ptr{Float64}, C_NULL)
-        Gjc = convert(Ptr{Int64}, C_NULL)
-        Gir = convert(Ptr{Int64}, C_NULL)
-    else
-        sparseG = sparse(G)
-        # Hack to make it a float, find a better way
-        Gpr = sparseG.nzval * 1.0
-        # -1 since the C language is 0 indexed
-        Gjc = sparseG.colptr - 1
-        Gir = sparseG.rowval - 1
-    end
+    sparseG = sparse(G)
+    Gpr = convert(Vector{Float64}, sparseG.nzval)
+    Gjc = sparseG.colptr - 1  # C is 0-based
+    Gir = sparseG.rowval - 1
 
-    if b == nothing
-        b = convert(Ptr{Float64}, C_NULL)
-    end
-
-    if h == nothing
-        h = convert(Ptr{Float64}, C_NULL)
-    end
-
-    ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork}, (Clong, Clong, Clong, Clong, Clong,
-            Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong}, Ptr{Cdouble}, Ptr{Clong},
-            Ptr{Clong}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}), n, m, p, l, ncones,
-            q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
+    setup(  n, m, p, l, ncones, q, 
+            Gpr, Gjc, Gir,
+            Apr, Ajc, Air,
+            c, h, b)
 end
 
+# solve
+# Solves the provided problem. Results are stored inside the structure,
+# but currently there is no convenient interface-provided way to access
+# this - use MathProgBase interface.
 function solve(problem::Ptr{Cpwork})
     exitflag = ccall((:ECOS_solve, ECOS.ecos), Clong, (Ptr{Cpwork},), problem)
 end
 
-function cleanup(problem::Ptr{Cpwork}, keepvars::Clong)
+# cleanup
+# Frees memory allocated by ECOS for the problem.
+# The optional keepvars argument is number of variables to NOT free.
+function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
     ccall((:ECOS_cleanup, ECOS.ecos), Void, (Ptr{Cpwork}, Clong), problem, keepvars)
+end
+
+# ver  [not exported]
+# Returns the version of ECOS in use
+function ver()
+    ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{Uint8}, ())
+    return bytestring(pointer_to_array(ver_ptr, 7))
 end
 
 end # module

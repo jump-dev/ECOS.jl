@@ -129,17 +129,11 @@ end
 
 function optimize!(m::ECOSMathProgModel)
     ecos_prob_ptr = setup(
-        n       = m.nvar,
-        m       = m.nineq,
-        p       = m.neq,
-        l       = m.npos,
-        ncones  = m.ncones,
-        q       = m.conedims,
-        G       = m.G,
-        A       = m.A,
-        c       = m.c[:],  # Seems to modify this
-        h       = m.h,
-        b       = m.b)
+        m.nvar, m.nineq, m.neq,
+        m.npos, m.ncones, m.conedims,
+        m.G, m.A,
+        m.c[:],  # Seems to modify this
+        m.h, m.b)
 
     flag = solve(ecos_prob_ptr)
     if flag == ECOS_OPTIMAL

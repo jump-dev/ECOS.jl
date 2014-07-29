@@ -26,21 +26,22 @@ type ECOSMathProgModel <: AbstractMathProgModel
     G::SparseMatrixCSC{Float64,Int}     # The G matrix (inequalties)
     A::SparseMatrixCSC{Float64,Int}     # The A matrix (equalities)
     c::Vector{Float64}                  # The objective coeffs (always min)
-    original_sense::Symbol              # Original objective sense
+    orig_sense::Symbol                  # Original objective sense
     h::Vector{Float64}                  # RHS for inequality 
     b::Vector{Float64}                  # RHS for equality
     # Post-solve
     solve_stat::Symbol
     obj_val::Float64
     primal_sol::Vector{Float64}
-end
+    fwd_map::Vector{Int}                # To reorder solution if we solved
+end                                     # using the conic interface
 ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         Int[],
                                         spzeros(0,0),
                                         spzeros(0,0),
                                         Float64[], :Min,
                                         Float64[], Float64[],
-                                        :NotSolved, 0.0, Float64[])
+                                        :NotSolved, 0.0, Float64[], Int[])
 
 #############################################################################
 # Begin implementation of the MPB low-level interface 
@@ -120,9 +121,10 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
     m.A         = sparse(A[eqidx,:])    # The A matrix (equalities)
     m.c         = (sense == :Max) ? obj * -1 : obj[:] 
                                         # The objective coeffs (always min)
-    m.original_sense = sense            # Original objective sense
+    m.orig_sense = sense                # Original objective sense
     m.h         = ineqbnd               # RHS for inequality 
     m.b         = eqbnd                 # RHS for equality
+    m.fwd_map   = [i in 1:nvar]         # Identity mapping
 end
 
 function optimize!(m::ECOSMathProgModel)
@@ -154,13 +156,13 @@ function optimize!(m::ECOSMathProgModel)
     # Extract solution
     ecos_prob = pointer_to_array(ecos_prob_ptr, 1)[1]
     m.primal_sol = pointer_to_array(ecos_prob.x, m.nvar)[:]
-    m.obj_val = dot(m.c, m.primal_sol) * (m.original_sense == :Max ? -1 : +1)  
+    m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)  
     cleanup(ecos_prob_ptr, 0)
 end
 
 status(m::ECOSMathProgModel) = m.solve_stat
 getobjval(m::ECOSMathProgModel) = m.obj_val
-getsolution(m::ECOSMathProgModel) = m.primal_sol
+getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 
 #############################################################################
 # Begin implementation of the MPB conic interface 
@@ -169,6 +171,8 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
 function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
+    # TODO (if it matters): make this more efficient for sparse A
+
     # We don't support SOCRotated, SDP, or Exp*
     bad_cones = [:SOCRotated, :SDP, :ExpPrimal, :ExpDual]
     for cone_vars in cones
@@ -181,91 +185,109 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     #       x in K                      h - Gx in K
 
     # Expand out the cones info
-    # TODO: Don't assume sorted
-    expand_cones = Symbol[]
-    for cone_vars in cones
-        cone_type, idxs = cone_vars
-        if isa(idxs, Int)
-            push!(expand_cones, cone_type)
-        else 
-            # Assume its iterable
-            for i in idxs
-                push!(expand_cones, cone_type)
-            end
+    # The cones can come in any order, so we need to build a mapping
+    # from the variable indices in the input to the internal ordering
+    # we will use.
+    
+    # In the first past we'll just count up the number of variables 
+    # of each type.
+    num_vars = 0
+    for (cone_type, idxs) in cones
+        num_vars += length(idxs)
+    end
+    fwd_map = Array(Int,    num_vars)  # Will be used for SOCs
+    rev_map = Array(Int,    num_vars)  # Need to restore sol. vec.
+    idxcone = Array(Symbol, num_vars)  # We'll uses this for non-SOCs
+
+    # Now build the mapping
+    pos = 1
+    for (cone, idxs) in cones
+        for i in idxs
+            fwd_map[i]   = pos   # fwd_map = orig idx -> internal idx
+            rev_map[pos] = i     # rev_map = internal idx -> orig idx
+            idxcone[pos] = cone
+            pos += 1
         end
     end
-    nvar = length(expand_cones)
 
-    # Start with the data provided
-    ecos_c = copy(c)
-    ecos_A = copy(A)
-    ecos_b = copy(b)
+    # Rearrange data into the internal ordering
+    ecos_c = c[rev_map]
+    ecos_A = A[:,rev_map]
+    ecos_b = b[:]
 
     # For all variables in the :Zero cone, fix at 0 with an
-    # equality constraint.
-    # TODO: Don't even include them
-    for j = 1:nvar
-        if expand_cones[j] == :Zero
-            new_row = zeros(1,nvar)
-            new_row[j] = 1.0
-            ecos_A = vcat(ecos_A, new_row)
-            ecos_b = vcat(ecos_b, 0.0)
-        end
+    # equality constraint. TODO: Don't even include them
+
+    for j = 1:num_vars
+        idxcone[j] != :Zero && continue
+
+        new_row    = zeros(1,num_vars)
+        new_row[j] = 1.0
+        ecos_A     = vcat(ecos_A, new_row)
+        ecos_b     = vcat(ecos_b, 0.0)
     end
 
     # Build G matrix
-    ecos_G = Array(Float64,0,nvar)
-    ecos_h = Array(Float64,0)
-    # First, handle the :NonNeg, :NonPos cases
-    npos = 0
-    for j = 1:nvar
-        if expand_cones[j] == :NonNeg
-            new_row = zeros(1,nvar)
-            new_row[j] = -1.0
-            ecos_G = vcat(ecos_G, new_row)
-            ecos_h = vcat(ecos_h, 0.0)
-            npos += 1
-        elseif expand_cones[j] == :NonPos
-            new_row = zeros(1,nvar)
-            new_row[j] = +1.0
-            ecos_G = vcat(ecos_G, new_row)
-            ecos_h = vcat(ecos_h, 0.0)
-            npos += 1
-        end
+    # There will be one row for every :NonNeg and :NonPos cone
+    # and an additional row for every variable in a :SOC cone
+    # Or in other words, everything that isn't a :Free or :Zero
+    # gets a row in G and h
+    num_G_row = 0
+    for j = 1:num_vars
+        idxcone[j] == :Free && continue
+        idxcone[j] == :Zero && continue
+        num_G_row += 1
     end
-    # Now handle the SOCs
-    # Input form is basically just says
-    # || x || <= y
-    # and we pass into ECOS
-    # 0 - Ix \in Q
-    # which maps back to the same thing
-    ncones = 0
-    conedims = Int[]
-    for cone_vars in cones
-        cone_type, idxs = cone_vars
-        cone_type != :SOC && continue
-        ncones += 1
-        push!(conedims, length(idxs))
-        new_rows = zeros(length(idxs),nvar)
-        row = 1
-        for j in idxs
-            new_rows[row,j] = -1.0
-            row += 1
-            ecos_h = vcat(ecos_h, 0.0)
-        end
-        ecos_G = vcat(ecos_G, new_rows)
-    end
+    ecos_G = zeros(num_G_row,num_vars)
+    ecos_h = zeros(num_G_row)
 
-    m.nvar      = nvar
-    m.nineq     = length(ecos_h)
-    m.neq       = length(ecos_b)
-    m.npos      = npos
-    m.ncones    = ncones
-    m.conedims  = conedims
-    m.G         = ecos_G
-    m.A         = ecos_A
-    m.c         = ecos_c
-    m.original_sense = :Min
-    m.h         = ecos_h
-    m.b         = ecos_b
+    # First, handle the :NonNeg, :NonPos cases
+    num_pos_orth = 0
+    G_row = 1
+    for j = 1:num_vars
+        if idxcone[j] == :NonNeg
+            ecos_G[G_row,j] = -1.0
+            G_row += 1
+            num_pos_orth += 1
+        elseif idxcone[j] == :NonPos
+            ecos_G[G_row,j] = +1.0
+            G_row += 1
+            num_pos_orth += 1
+        end
+    end
+    @assert G_row == num_pos_orth + 1
+    # Now handle the SOCs
+    # The MPB unput form is basically just says a vector of
+    # variables (y,x) lives in the SOC  || x || <= y
+    # ECOS wants somethings in the form h - Gx in Q so we
+    # will prove 0 - Ix \in Q
+    num_SOC_cones = 0
+    SOC_conedims  = Int[]
+    for (cone, idxs) in cones
+        cone != :SOC && continue
+        # Found a new SOC
+        num_SOC_cones += 1
+        push!(SOC_conedims, length(idxs))
+        # Add the entries (carrying on from pos. orthant)
+        for j in idxs
+            ecos_G[G_row,fwd_map[j]] = -1.0
+            G_row += 1
+        end
+    end
+    @assert G_row == num_G_row + 1
+
+    # Store in the ECOS structure
+    m.nvar          = num_vars
+    m.nineq         = num_G_row
+    m.neq           = length(ecos_b)
+    m.npos          = num_pos_orth
+    m.ncones        = num_SOC_cones
+    m.conedims      = SOC_conedims
+    m.G             = ecos_G
+    m.A             = ecos_A
+    m.c             = ecos_c
+    m.orig_sense    = :Min
+    m.h             = ecos_h
+    m.b             = ecos_b
+    m.fwd_map       = fwd_map
 end

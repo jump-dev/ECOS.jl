@@ -34,7 +34,7 @@ MathProgBase.optimize!(m)
 @test_approx_eq_eps MathProgBase.getsolution(m)[2] 0.0 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[3] 2.0 1e-6
 
-# Problem 2 - mixed free, nonneg, nonpos, zero
+# Problem 2 - mixed free, nonneg, nonpos, zero, shuffled cones
 # min  3x + 2y - 4z + 0s
 # st    x           -  s  == -4    (i.e. x >= -4)
 #            y            == -3
@@ -52,7 +52,7 @@ MathProgBase.loadconicproblem!(m,
                       0.0   1.0   0.0   0.0;
                       1.0   0.0   1.0   0.0],
                     [-4.0, -3.0, 12.0],
-                    [(:Free,1), (:NonPos,2), (:NonNeg,3), (:Zero,4)])
+                    [(:Free,1), (:NonNeg,3), (:Zero,4), (:NonPos,2)])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal
 @test_approx_eq_eps MathProgBase.getobjval(m) -82 1e-6

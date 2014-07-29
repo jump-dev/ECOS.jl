@@ -124,7 +124,7 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
     m.orig_sense = sense                # Original objective sense
     m.h         = ineqbnd               # RHS for inequality 
     m.b         = eqbnd                 # RHS for equality
-    m.fwd_map   = [i in 1:nvar]         # Identity mapping
+    m.fwd_map   = [1:nvar]              # Identity mapping
 end
 
 function optimize!(m::ECOSMathProgModel)

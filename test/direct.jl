@@ -9,6 +9,9 @@
 
 # The values below are copied from data.h in ECOS source code
 import ECOS
+
+println(ECOS.ver())
+
 n = 223
 m = 220
 p = 114
@@ -47,4 +50,4 @@ mywork = ECOS.setup(n, m, p, l, ncones, q, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b
 exitflag = ECOS.solve(mywork)
 
 # Call after comparing values with correct values
-#ECOS.cleanup(mywork, 0)
+ECOS.cleanup(mywork, 0)

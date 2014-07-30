@@ -4,10 +4,10 @@ using BinDeps
 
 ecos = library_dependency("ecos", aliases=["libecos"])
 
-#@osx_only begin
-#    using Homebrew
-#    provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
-#end
+@osx_only begin
+    using Homebrew
+    provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
+end
 
 # This is the git commit that includes our merged patches as of 07/30/2014
 # This is safer than unpacking from master which may cause ECOS.jl to

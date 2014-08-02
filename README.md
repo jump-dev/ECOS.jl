@@ -30,16 +30,17 @@ This example shows how we can model a simple knapsack problem with JuMP and use 
 ```julia
 using JuMP
 import ECOS
-m = Model(solver=ECOS.ECOSSolver())
 
 items  = [:Gold, :Silver, :Bronze]
 values = [:Gold => 5.0,  :Silver => 3.0,  :Bronze => 1.0]
 weight = [:Gold => 2.0,  :Silver => 1.5,  :Bronze => 0.3]
 
+m = Model(solver=ECOS.ECOSSolver())
 @defVar(m, 0 <= take[items] <= 1)  # Define a variable for each item
 @setObjective(m, Max, sum{ values[item] * take[item], item in items})
 @addConstraint(m, sum{ weight[item] * take[item], item in items} <= 3)
 solve(m)
+
 println(getValue(take))
 # take
 # [  Gold] = 0.9999999680446406

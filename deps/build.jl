@@ -12,11 +12,15 @@ end
 # This is the git commit that includes our merged patches as of 07/30/2014
 # This is safer than unpacking from master which may cause ECOS.jl to
 # not work properly
-provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/d206a556a83396756f3200964de162b4a7523c62.tar.gz"),
-    [ecos], os = :Unix, unpacked_dir="ecos-d206a556a83396756f3200964de162b4a7523c62")
+version = "d206a556a83396756f3200964de162b4a7523c62"
+provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/$version.tar.gz"),
+    [ecos], os = :Unix, unpacked_dir="ecos-$version")
 
 prefix = joinpath(BinDeps.depsdir(ecos),"usr")
-srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-d206a556a83396756f3200964de162b4a7523c62")
+srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-$version")
+
+provides(Binaries, URI("http://sourceforge.net/projects/juliadeps-win/files/ecos-1.0.3.7z"),
+    [ecos], unpacked_dir="usr$WORD_SIZE/bin", os = :Windows)
 
 # We'll keep this around for emergencies, but OSX users should be able to use Homebrew
 provides(SimpleBuild,

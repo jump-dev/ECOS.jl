@@ -15,7 +15,7 @@ julia> Pkg.add("ECOS")
 ECOS.jl will automatically setup the ECOS solver itself:
  - On Linux it will build from source
  - On OS X it will download a binary via [Homebrew.jl].
- - On Windows it will download a binary. [There is currently an issue with the 64-bit version of ECOS on Windows.](https://github.com/JuliaOpt/ECOS.jl/pull/8).
+ - On Windows it will download a binary.
 
 ## Usage
 

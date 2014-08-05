@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/JuliaOpt/ECOS.jl.svg?branch=master)](https://travis-ci.org/JuliaOpt/ECOS.jl)
 [![Coverage Status](https://img.shields.io/coveralls/JuliaOpt/ECOS.jl.svg)](https://coveralls.io/r/JuliaOpt/ECOS.jl)
+[![Build status](https://ci.appveyor.com/api/projects/status/bnvddmeevtrmjyc2/branch/master)](https://ci.appveyor.com/project/mlubin/ecos-jl/branch/master)
 
 Julia wrapper for the [ECOS](https://github.com/ifa-ethz/ecos) embeddable second-order cone problem (SOCP) interior point solver.
 

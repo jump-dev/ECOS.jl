@@ -7,8 +7,7 @@
 # MathProgBase.jl interface for the ECOS.jl solver wrapper
 #############################################################################
 
-require(joinpath(Pkg.dir("MathProgBase"),"src","MathProgSolverInterface.jl"))
-importall MathProgSolverInterface
+importall MathProgBase.SolverInterface
 
 #############################################################################
 # Define the MPB Solver and Model objects

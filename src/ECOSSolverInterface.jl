@@ -7,7 +7,7 @@
 # MathProgBase.jl interface for the ECOS.jl solver wrapper
 #############################################################################
 
-importall MathProgBase.SolverInterface
+importall MathProgBase.MathProgSolverInterface
 
 #############################################################################
 # Define the MPB Solver and Model objects

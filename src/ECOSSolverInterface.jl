@@ -216,7 +216,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
 
     ###################################################################
     # PHASE ONE  -  MAP x ∈ K_2 to ECOS form, except SOC
-
+    
     # If a variable is in :Zero cone, fix at 0 with equality constraint.
     for j = 1:num_vars
         idxcone[j] != :Zero && continue
@@ -256,7 +256,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     @assert G_row == num_pos_orth + 1
     
     ###################################################################
-    # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form
+    # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form, except SOC
     
     rows_to_remove = Int[]
     for (cone,idxs) in constr_cones
@@ -280,12 +280,6 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
             rows_to_remove = vcat(rows_to_remove, rows)
         end
     end
-
-    # Now we can rebound A,b given the remove rows
-    rows_to_keep = collect(symdiff( IntSet(rows_to_remove),
-                                    IntSet(1:length(ecos_b))))
-    ecos_A = ecos_A[rows_to_keep,:]
-    ecos_b = ecos_b[rows_to_keep]
 
     ###################################################################
     # PHASE THREE  -  MAP x ∈ SOC to ECOS form
@@ -315,6 +309,29 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
         end
     end
     @assert G_row == num_pos_orth + num_G_row_soc + 1
+
+    ###################################################################
+    # PHASE FOUR  -  MAP b-Ax ∈ SOC to ECOS form
+    
+    for (cone,idxs) in constr_cones
+        if cone == :SOC
+            # Maps directly to ECOS form
+            rows   = Int[idxs]
+            ecos_G = vcat(ecos_G, -ecos_A[rows,:])
+            ecos_h = vcat(ecos_h, -ecos_b[rows])
+            num_SOC_cones += 1
+            push!(SOC_conedims, length(idxs))
+            rows_to_remove = vcat(rows_to_remove, rows)
+        end
+    end
+
+    # Now we can remove rows from A, b
+    rows_to_keep = collect(symdiff( IntSet(rows_to_remove),
+                                    IntSet(1:length(ecos_b))))
+    ecos_A = ecos_A[rows_to_keep,:]
+    ecos_b = ecos_b[rows_to_keep]
+
+
 
     ###################################################################
     # Store in the ECOS structure

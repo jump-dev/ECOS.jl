@@ -144,3 +144,29 @@ MathProgBase.optimize!(m)
 @test_approx_eq_eps MathProgBase.getsolution(m)[1] 1.0 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[2] 1.0/sqrt(2.0) 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[3] 1.0/sqrt(2.0) 1e-6
+
+
+
+# Problem 3A - Problem 3 but in ECOS form
+# min   0x - 1y - 1z
+#  st 1 -x            ZERO 
+#       -x            SOC 0
+#            -y       SOC 0
+#                -z   SOC 0
+println("Problem 3A")
+m = MathProgBase.model(s)
+MathProgBase.loadconicproblem!(m,
+                    [ 0.0, -1.0, -1.0],
+                    [ 1.0   0.0   0.0;
+                      1.0   0.0   0.0;
+                      0.0   1.0   0.0;
+                      0.0   0.0   1.0],
+                    [ 1.0, 0.0, 0.0, 0.0],
+                    {(:Zero,1),(:SOC,2:4)},
+                    [(:Free,1:3)])
+MathProgBase.optimize!(m)
+@test MathProgBase.status(m) == :Optimal
+@test_approx_eq_eps MathProgBase.getobjval(m) -sqrt(2.0) 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[1] 1.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[2] 1.0/sqrt(2.0) 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[3] 1.0/sqrt(2.0) 1e-6

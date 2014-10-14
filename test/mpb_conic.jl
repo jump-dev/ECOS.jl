@@ -26,6 +26,7 @@ MathProgBase.loadconicproblem!(m,
                     [ 1.0   1.0   1.0;
                       0.0   1.0   1.0],
                     [ 3.0,  2.0],
+                    [(:Zero,1:2)],
                     [(:NonNeg, 1:3)])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal
@@ -52,6 +53,7 @@ MathProgBase.loadconicproblem!(m,
                       0.0   1.0   0.0   0.0;
                       1.0   0.0   1.0   0.0],
                     [-4.0, -3.0, 12.0],
+                    [(:Zero,1:3)],
                     [(:Free,1), (:NonNeg,3), (:Zero,4), (:NonPos,2)])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal
@@ -70,6 +72,7 @@ MathProgBase.loadconicproblem!(m,
                     [ 0.0, -1.0, -1.0],
                     [ 1.0   0.0   0.0],
                     [ 1.0],
+                    [(:Zero,1)],
                     [(:SOC,1:3)])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal

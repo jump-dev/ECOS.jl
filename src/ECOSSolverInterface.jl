@@ -163,41 +163,46 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 # - loadconicproblem!
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
-function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
-    # TODO (if it matters): make this more efficient for sparse A
+function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
+    # TODO
+    # - Make this more efficient for sparse A
+    # - Remove variables in the :Zero cone
 
     # We don't support SOCRotated, SDP, or Exp*
     bad_cones = [:SOCRotated, :SDP, :ExpPrimal, :ExpDual]
-    for cone_vars in cones
+    for cone_vars in constr_cones
+        cone_vars[1] in bad_cones && error("Cone type $(cone_vars[1]) not supported")
+    end
+    for cone_vars in var_cones
         cone_vars[1] in bad_cones && error("Cone type $(cone_vars[1]) not supported")
     end
 
     # MathProgBase form             ECOS form
-    # min c'x                       min c'x
-    # st  A x = b                   st  A x = b
-    #       x in K                      h - Gx in K
+    # min  c'x                      min  c'x
+    #  st b-Ax ∈ K_1                 st   Ax = b
+    #        x ∈ K_2                    h-Gx ∈ K
+    #
+    # Mapping:
+    # * For the constaints (K_1)
+    #   * If :Zero cone, then treat as equality constraint in ECOS form
+    #   * Otherewise trivially maps to h-Gx in ECOS form
+    # * For the variables (K_2)
+    #   * If :Free, do nothing
+    #   * If :Zero, put in as equality constraint
+    #   * If rest, stick in h-Gx
 
-    # Expand out the cones info
-    # The cones can come in any order, so we need to build a mapping
-    # from the variable indices in the input to the internal ordering
-    # we will use.
-    
-    # In the first past we'll just count up the number of variables 
-    # of each type.
-    num_vars = 0
-    for (cone_type, idxs) in cones
-        num_vars += length(idxs)
-    end
+    # Allocate space for the ECOS variables
+    num_vars = length(c)
     fwd_map = Array(Int,    num_vars)  # Will be used for SOCs
     rev_map = Array(Int,    num_vars)  # Need to restore sol. vec.
     idxcone = Array(Symbol, num_vars)  # We'll uses this for non-SOCs
 
-    # Now build the mapping
+    # Now build the mapping between MPB variables and ECOS variables
     pos = 1
-    for (cone, idxs) in cones
+    for (cone, idxs) in var_cones
         for i in idxs
-            fwd_map[i]   = pos   # fwd_map = orig idx -> internal idx
-            rev_map[pos] = i     # rev_map = internal idx -> orig idx
+            fwd_map[i]   = pos   # fwd_map = MPB idx -> ECOS idx
+            rev_map[pos] = i     # rev_map = ECOS idx -> MPB idx
             idxcone[pos] = cone
             pos += 1
         end
@@ -208,9 +213,10 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     ecos_A = A[:,rev_map]
     ecos_b = b[:]
 
-    # For all variables in the :Zero cone, fix at 0 with an
-    # equality constraint. TODO: Don't even include them
+    ###################################################################
+    # PHASE ONE  -  MAP x ∈ K_2 to ECOS form
 
+    # If a variable is in :Zero cone, fix at 0 with equality constraint.
     for j = 1:num_vars
         idxcone[j] != :Zero && continue
 
@@ -220,21 +226,18 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
         ecos_b     = vcat(ecos_b, 0.0)
     end
 
-    # Build G matrix
-    # There will be one row for every :NonNeg and :NonPos cone
-    # and an additional row for every variable in a :SOC cone
-    # Or in other words, everything that isn't a :Free or :Zero
-    # gets a row in G and h
+    # G matrix:
+    # * 1 row ∀ :NonNeg & :NonPos cones
+    # * 1 row ∀ variable in :SOC cone
     num_G_row = 0
     for j = 1:num_vars
-        idxcone[j] == :Free && continue
-        idxcone[j] == :Zero && continue
+        (idxcone[j] == :Free || idxcone[j] == :Zero) && continue
         num_G_row += 1
     end
     ecos_G = zeros(num_G_row,num_vars)
     ecos_h = zeros(num_G_row)
 
-    # First, handle the :NonNeg, :NonPos cases
+    # Handle the :NonNeg, :NonPos cases
     num_pos_orth = 0
     G_row = 1
     for j = 1:num_vars
@@ -249,14 +252,13 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
         end
     end
     @assert G_row == num_pos_orth + 1
-    # Now handle the SOCs
-    # The MPB unput form is basically just says a vector of
-    # variables (y,x) lives in the SOC  || x || <= y
-    # ECOS wants somethings in the form h - Gx in Q so we
-    # will prove 0 - Ix \in Q
+    
+    # Handle the :SOC
+    # MPB  form: vector of var (y,x) is in the SOC ||x|| <= y
+    # ECOS form: h - Gx ∈ Q  -->  0 - Ix ∈ Q
     num_SOC_cones = 0
     SOC_conedims  = Int[]
-    for (cone, idxs) in cones
+    for (cone, idxs) in var_cones
         cone != :SOC && continue
         # Found a new SOC
         num_SOC_cones += 1
@@ -269,18 +271,22 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, cones)
     end
     @assert G_row == num_G_row + 1
 
+    ###################################################################
+    # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form
+    # Assume all equality
+
     # Store in the ECOS structure
-    m.nvar          = num_vars
-    m.nineq         = num_G_row
-    m.neq           = length(ecos_b)
-    m.npos          = num_pos_orth
-    m.ncones        = num_SOC_cones
-    m.conedims      = SOC_conedims
+    m.nvar          = num_vars          # Num variable
+    m.nineq         = num_G_row         # Num inequality constraints
+    m.neq           = length(ecos_b)    # Num equality constraints
+    m.npos          = num_pos_orth      # Num ineq. constr. in +ve orthant
+    m.ncones        = num_SOC_cones     # Num second-order cones
+    m.conedims      = SOC_conedims      # Num contr. in each SOC
     m.G             = ecos_G
     m.A             = ecos_A
     m.c             = ecos_c
     m.orig_sense    = :Min
     m.h             = ecos_h
     m.b             = ecos_b
-    m.fwd_map       = fwd_map
+    m.fwd_map       = fwd_map           # Used to return solution
 end

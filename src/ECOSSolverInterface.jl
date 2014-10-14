@@ -317,8 +317,8 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
         if cone == :SOC
             # Maps directly to ECOS form
             rows   = Int[idxs]
-            ecos_G = vcat(ecos_G, -ecos_A[rows,:])
-            ecos_h = vcat(ecos_h, -ecos_b[rows])
+            ecos_G = vcat(ecos_G, ecos_A[rows,:])
+            ecos_h = vcat(ecos_h, ecos_b[rows])
             num_SOC_cones += 1
             push!(SOC_conedims, length(idxs))
             rows_to_remove = vcat(rows_to_remove, rows)

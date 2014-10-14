@@ -22,7 +22,7 @@ ECOS.jl will automatically setup the ECOS solver itself:
 
 The ECOS interface is completely wrapped: the package exports the functions `setup`, `solve`, and `cleanup`; it provides but does not export `ECOS_ver`. Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.
 
-ECOS.jl also supports the [JuliaOpt] **[MathProgBase]** standard solver interface. This interface can be used to solve linear programs using `loadproblem!` (see `test/mpb_lin.jl`) and SOCPs through `loadconicproblem!` (see `test/mpb_conic.jl`). Thanks to this support ECOS can be used as a solver with both the **[JuMP]** and (in the very near future) **[CVX.jl]** modeling languages.
+ECOS.jl also supports the [JuliaOpt] **[MathProgBase]** standard solver interface. This interface can be used to solve linear programs using `loadproblem!` (see `test/mpb_lin.jl`) and SOCPs through `loadconicproblem!` (see `test/mpb_conic.jl`). Thanks to this support ECOS can be used as a solver with both the **[JuMP]** and (in the very near future) **[Convex.jl]** modeling languages.
 
 ### JuMP example
 
@@ -55,6 +55,6 @@ println(getValue(take))
 
 [MathProgBase]: https://github.com/JuliaOpt/MathProgBase.jl
 [JuMP]: https://github.com/JuliaOpt/JuMP.jl
-[CVX.jl]: https://github.com/cvxgrp/CVX.jl
+[Convex.jl]: https://github.com/cvxgrp/Convex.jl
 [Homebrew.jl]: https://github.com/JuliaLang/Homebrew.jl
 [JuliaOpt]: http://juliaopt.org

@@ -263,18 +263,18 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
         cone == :Free && error("Free cone constraints not handled")
         cone == :Zero && continue  # No work to do
         if cone == :NonNeg
-            # b-a'x >= 0 - flip sign, maps to a row in h-Gx
+            # b-a'x >= 0 - maps to a row in h-Gx
             rows   = Int[idxs]
-            ecos_G = vcat(ecos_G, -ecos_A[rows,:])
-            ecos_h = vcat(ecos_h, -ecos_b[rows])
+            ecos_G = vcat(ecos_G,  ecos_A[rows,:])
+            ecos_h = vcat(ecos_h,  ecos_b[rows])
             G_row += length(rows)
             num_pos_orth += length(rows)
             rows_to_remove = vcat(rows_to_remove, rows)
         elseif cone == :NonPos
-            # b-a'x <= 0 - maps to a row in h-Gx
+            # b-a'x <= 0 - flip sign, then maps to a row in h-Gx
             rows   = Int[idxs]
-            ecos_G = vcat(ecos_G,  ecos_A[rows,:])
-            ecos_h = vcat(ecos_h,  ecos_b[rows])
+            ecos_G = vcat(ecos_G, -ecos_A[rows,:])
+            ecos_h = vcat(ecos_h, -ecos_b[rows])
             G_row += length(rows)
             num_pos_orth += length(rows)
             rows_to_remove = vcat(rows_to_remove, rows)

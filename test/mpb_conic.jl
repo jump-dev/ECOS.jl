@@ -20,6 +20,7 @@ s = ECOSSolver()
 #       x>=0 y>=0 z>=0
 # Opt solution = -11
 # x = 1, y = 0, z = 2
+println("Problem 1")
 m = MathProgBase.model(s)
 MathProgBase.loadconicproblem!(m, 
                     [-3.0, -2.0, -4.0],
@@ -28,6 +29,35 @@ MathProgBase.loadconicproblem!(m,
                     [ 3.0,  2.0],
                     [(:Zero,1:2)],
                     [(:NonNeg, 1:3)])
+MathProgBase.optimize!(m)
+@test MathProgBase.status(m) == :Optimal
+@test_approx_eq_eps MathProgBase.getobjval(m) -11 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[1] 1.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[2] 0.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[3] 2.0 1e-6
+
+# Problem 1A - same as Problem 1, but with variable bounds
+#              as constraints instead
+# min -3x - 2y - 4z
+# st    x +  y +  z == 3
+#            y +  z == 2
+#       x           >= 0
+#            y      >= 0
+#                -z <= 0
+# Opt solution = -11
+# x = 1, y = 0, z = 2
+println("Problem 1A")
+m = MathProgBase.model(s)
+MathProgBase.loadconicproblem!(m, 
+                    [-3.0, -2.0, -4.0],
+                    [ 1.0   1.0   1.0;
+                      0.0   1.0   1.0;
+                      1.0   0.0   0.0;
+                      0.0   1.0   0.0;
+                      0.0   0.0  -1.0],
+                    [ 3.0,  2.0,  0.0,  0.0,  0.0],
+                    [(:Zero,1:2),(:NonNeg,3:4),(:NonPos,5)],
+                    [(:Free, 1:3)])
 MathProgBase.optimize!(m)
 @test MathProgBase.status(m) == :Optimal
 @test_approx_eq_eps MathProgBase.getobjval(m) -11 1e-6
@@ -46,6 +76,7 @@ MathProgBase.optimize!(m)
 #       s zero
 # Opt solution = -82
 # x = -4, y = -3, z = 16, s == 0
+println("Problem 2")
 m = MathProgBase.model(s)
 MathProgBase.loadconicproblem!(m,
                     [ 3.0,  2.0, -4.0,  0.0],
@@ -63,10 +94,43 @@ MathProgBase.optimize!(m)
 @test_approx_eq_eps MathProgBase.getsolution(m)[3] 16.0 1e-6
 @test_approx_eq_eps MathProgBase.getsolution(m)[4]  0.0 1e-6
 
+# Problem 2A - Problem 2 but with y,z variable bounds as constraints
+# min  3x + 2y - 4z + 0s
+# st    x           -  s  == -4    (i.e. x >= -4)
+#            y            == -3
+#       x      +  z       == 12
+#            y            <=  0
+#                 z       >=  0
+#       x free
+#       s zero
+# Opt solution = -82
+# x = -4, y = -3, z = 16, s == 0
+println("Problem 2A")
+m = MathProgBase.model(s)
+MathProgBase.loadconicproblem!(m,
+                    [ 3.0,  2.0, -4.0,  0.0],
+                    [ 1.0   0.0   0.0  -1.0;
+                      0.0   1.0   0.0   0.0;
+                      1.0   0.0   1.0   0.0;
+                      0.0   1.0   0.0   0.0;
+                      0.0   0.0   1.0   0.0],
+                    [-4.0, -3.0, 12.0,  0.0,  0.0],
+                    [(:Zero,1:3),(:NonPos,4),(:NonNeg,5)],
+                    [(:Free,1), (:NonNeg,3), (:Zero,4), (:NonPos,2)])
+MathProgBase.optimize!(m)
+@test MathProgBase.status(m) == :Optimal
+@test_approx_eq_eps MathProgBase.getobjval(m) -82 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[1] -4.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[2] -3.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[3] 16.0 1e-6
+@test_approx_eq_eps MathProgBase.getsolution(m)[4]  0.0 1e-6
+
+
 # Problem 3 - SOC
 # min 0x - 1y - 1z
 #  st  x            == 1
 #      x >= ||(y,z)||
+println("Problem 3")
 m = MathProgBase.model(s)
 MathProgBase.loadconicproblem!(m,
                     [ 0.0, -1.0, -1.0],

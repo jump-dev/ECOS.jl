@@ -164,10 +164,6 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
 function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
-    # TODO
-    # - Remove variables in the :Zero cone
-    # - Maybe handle :Free cone in constraints
-
     # If A is sparse, we should use an appropriate "zeros"
     const zeromat = isa(A,SparseMatrixCSC) ? spzeros : zeros
 
@@ -193,6 +189,13 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     #   * If :Free, do nothing
     #   * If :Zero, put in as equality constraint
     #   * If rest, stick in h-Gx
+    #
+    # Approach:
+    # 0. Figure out a mapping between MPB and ECOS
+    # 1. Map non-SOC variables to ECOS form
+    # 2. Map non-SOC constraints to ECOS form
+    # 3. Map SOC variables to ECOS form
+    # 4. Map SOC constraints to ECOS form
 
     # Allocate space for the ECOS variables
     num_vars = length(c)
@@ -261,22 +264,23 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form, except SOC
     
     # Collect all the rows we'll be appending to G,h
-    pos_rows = Int[]
-    neg_rows = Int[]
-    rows_to_remove = Int[]
+    pos_rows   = Int[]
+    neg_rows   = Int[]
+    rows_to_rm = Int[]
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
         cone == :Zero && continue  # No work to do
         cone == :SOC  && continue  # Handle later
         G_row         += length(idxs)
         num_pos_orth  += length(idxs)
-        rows_to_remove = vcat(rows_to_remove, idxs)
+        idx_list       = Int[idxs]
+        rows_to_rm     = vcat(rows_to_rm, idx_list)
         if cone == :NonNeg
             # b-a'x >= 0 - maps to a row in h-Gx
-            pos_rows = vcat(pos_rows, idxs)
+            pos_rows = vcat(pos_rows, idx_list)
         elseif cone == :NonPos
             # b-a'x <= 0 - flip sign, then maps to a row in h-Gx
-            neg_rows = vcat(neg_rows, idxs)
+            neg_rows = vcat(neg_rows, idx_list)
         end
     end
     ecos_G = vcat(ecos_G,  ecos_A[pos_rows,:])
@@ -322,20 +326,19 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
         if cone == :SOC
             num_SOC_cones += 1
             push!(SOC_conedims, length(idxs))
-            all_rows = vcat(all_rows, idxs)
-            rows_to_remove = vcat(rows_to_remove, Int[idxs])
+            idx_list   = Int[idxs]
+            all_rows   = vcat(all_rows,   idx_list)
+            rows_to_rm = vcat(rows_to_rm, idx_list)
         end
     end
     ecos_G = vcat(ecos_G, ecos_A[all_rows,:])
     ecos_h = vcat(ecos_h, ecos_b[all_rows])
 
     # Now we can remove rows from A, b
-    rows_to_keep = collect(symdiff( IntSet(rows_to_remove),
+    rows_to_keep = collect(symdiff( IntSet(rows_to_rm),
                                     IntSet(1:length(ecos_b))))
     ecos_A = ecos_A[rows_to_keep,:]
     ecos_b = ecos_b[rows_to_keep]
-
-
 
     ###################################################################
     # Store in the ECOS structure

@@ -260,28 +260,29 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     ###################################################################
     # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form, except SOC
     
+    # Collect all the rows we'll be appending to G,h
+    pos_rows = Int[]
+    neg_rows = Int[]
     rows_to_remove = Int[]
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
         cone == :Zero && continue  # No work to do
+        cone == :SOC  && continue  # Handle later
+        G_row         += length(idxs)
+        num_pos_orth  += length(idxs)
+        rows_to_remove = vcat(rows_to_remove, idxs)
         if cone == :NonNeg
             # b-a'x >= 0 - maps to a row in h-Gx
-            rows   = Int[idxs]
-            ecos_G = vcat(ecos_G,  ecos_A[rows,:])
-            ecos_h = vcat(ecos_h,  ecos_b[rows])
-            G_row += length(rows)
-            num_pos_orth += length(rows)
-            rows_to_remove = vcat(rows_to_remove, rows)
+            pos_rows = vcat(pos_rows, idxs)
         elseif cone == :NonPos
             # b-a'x <= 0 - flip sign, then maps to a row in h-Gx
-            rows   = Int[idxs]
-            ecos_G = vcat(ecos_G, -ecos_A[rows,:])
-            ecos_h = vcat(ecos_h, -ecos_b[rows])
-            G_row += length(rows)
-            num_pos_orth += length(rows)
-            rows_to_remove = vcat(rows_to_remove, rows)
+            neg_rows = vcat(neg_rows, idxs)
         end
     end
+    ecos_G = vcat(ecos_G,  ecos_A[pos_rows,:])
+    ecos_G = vcat(ecos_G, -ecos_A[neg_rows,:])
+    ecos_h = vcat(ecos_h,  ecos_b[pos_rows])
+    ecos_h = vcat(ecos_h, -ecos_b[neg_rows])
 
     ###################################################################
     # PHASE THREE  -  MAP x ∈ SOC to ECOS form

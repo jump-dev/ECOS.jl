@@ -32,6 +32,8 @@ type ECOSMathProgModel <: AbstractMathProgModel
     solve_stat::Symbol
     obj_val::Float64
     primal_sol::Vector{Float64}
+    dual_sol_eq::Vector{Float64}
+    dual_sol_ineq::Vector{Float64}
     fwd_map::Vector{Int}                # To reorder solution if we solved
 end                                     # using the conic interface
 ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
@@ -40,7 +42,9 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         spzeros(0,0),
                                         Float64[], :Min,
                                         Float64[], Float64[],
-                                        :NotSolved, 0.0, Float64[], Int[])
+                                        :NotSolved, 0.0, 
+                                        Float64[],
+                                        Float64[], Float64[], Int[])
 
 #############################################################################
 # Begin implementation of the MPB low-level interface 
@@ -149,6 +153,8 @@ function optimize!(m::ECOSMathProgModel)
     # Extract solution
     ecos_prob = pointer_to_array(ecos_prob_ptr, 1)[1]
     m.primal_sol = pointer_to_array(ecos_prob.x, m.nvar)[:]
+    m.dual_sol_eq   = pointer_to_array(ecos_prob.y, m.neq)
+    m.dual_sol_ineq = pointer_to_array(ecos_prob.y, m.nineq)
     m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)  
     cleanup(ecos_prob_ptr, 0)
 end
@@ -216,8 +222,8 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
 
     # Rearrange data into the internal ordering, make copy
     ecos_c = c[rev_map]
-    ecos_A = A[:,rev_map]
-    ecos_b = b[:]
+    ecos_A = zeromat(0,num_vars)
+    ecos_b = Float64[]
 
     ###################################################################
     # PHASE ONE  -  MAP x ∈ K_2 to ECOS form, except SOC
@@ -263,30 +269,30 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     ###################################################################
     # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form, except SOC
     
-    # Collect all the rows we'll be appending to G,h
-    pos_rows   = Int[]
-    neg_rows   = Int[]
-    rows_to_rm = Int[]
+    # Zero rows for Ax=b, NonNegPos rows to append to G,h
+     eq_rows = Int[]
+    pos_rows = Int[]
+    neg_rows = Int[]
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
-        cone == :Zero && continue  # No work to do
         cone == :SOC  && continue  # Handle later
-        G_row         += length(idxs)
-        num_pos_orth  += length(idxs)
-        idx_list       = Int[idxs]
-        rows_to_rm     = vcat(rows_to_rm, idx_list)
-        if cone == :NonNeg
-            # b-a'x >= 0 - maps to a row in h-Gx
-            pos_rows = vcat(pos_rows, idx_list)
-        elseif cone == :NonPos
-            # b-a'x <= 0 - flip sign, then maps to a row in h-Gx
-            neg_rows = vcat(neg_rows, idx_list)
+        idxset = Int[idxs]
+        if cone == :Zero
+            append!(eq_rows, idxset)
+            continue
         end
+        cone == :NonNeg && append!(pos_rows, idxset)
+        cone == :NonPos && append!(neg_rows, idxset)
     end
-    ecos_G = vcat(ecos_G,  ecos_A[pos_rows,:])
-    ecos_G = vcat(ecos_G, -ecos_A[neg_rows,:])
-    ecos_h = vcat(ecos_h,  ecos_b[pos_rows])
-    ecos_h = vcat(ecos_h, -ecos_b[neg_rows])
+    # Equality constraints / Zero cones
+    ecos_A = vcat(ecos_A,  A[eq_rows,rev_map])
+    ecos_b = vcat(ecos_b,  b[eq_rows])
+    ecos_G = vcat(ecos_G,  A[pos_rows,rev_map])
+    ecos_h = vcat(ecos_h,  b[pos_rows])
+    ecos_G = vcat(ecos_G, -A[neg_rows,rev_map])  # b-a'x <= 0 - flip sign, 
+    ecos_h = vcat(ecos_h, -b[neg_rows])          # then maps to a row in h-Gx
+    G_row         += length(pos_rows) + length(neg_rows)
+    num_pos_orth  += length(pos_rows) + length(neg_rows)
 
     ###################################################################
     # PHASE THREE  -  MAP x ∈ SOC to ECOS form
@@ -328,17 +334,10 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
             push!(SOC_conedims, length(idxs))
             idx_list   = Int[idxs]
             all_rows   = vcat(all_rows,   idx_list)
-            rows_to_rm = vcat(rows_to_rm, idx_list)
         end
     end
-    ecos_G = vcat(ecos_G, ecos_A[all_rows,:])
-    ecos_h = vcat(ecos_h, ecos_b[all_rows])
-
-    # Now we can remove rows from A, b
-    rows_to_keep = collect(symdiff( IntSet(rows_to_rm),
-                                    IntSet(1:length(ecos_b))))
-    ecos_A = ecos_A[rows_to_keep,:]
-    ecos_b = ecos_b[rows_to_keep]
+    ecos_G = vcat(ecos_G, A[all_rows,rev_map])
+    ecos_h = vcat(ecos_h, b[all_rows])
 
     ###################################################################
     # Store in the ECOS structure
@@ -355,4 +354,9 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     m.h             = ecos_h
     m.b             = ecos_b
     m.fwd_map       = fwd_map           # Used to return solution
+end
+
+
+function getconicdual(m::ECOSMathProgModel)
+    m.dual_sol
 end

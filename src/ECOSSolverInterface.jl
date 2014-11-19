@@ -19,9 +19,9 @@ type ECOSMathProgModel <: AbstractMathProgModel
     nvar::Int                           # Number of variables
     nineq::Int                          # Number of inequalities Gx <=_K h
     neq::Int                            # Number of equalities Ax = b
-    npos::Int                           # Number of ???
+    npos::Int                           # Number of positive orthant cones
     ncones::Int                         # Number of SO cones
-    conedims::Vector{Int}               # ?
+    conedims::Vector{Int}               # Dimension of each SO cone
     G::SparseMatrixCSC{Float64,Int}     # The G matrix (inequalties)
     A::SparseMatrixCSC{Float64,Int}     # The A matrix (equalities)
     c::Vector{Float64}                  # The objective coeffs (always min)
@@ -34,8 +34,14 @@ type ECOSMathProgModel <: AbstractMathProgModel
     primal_sol::Vector{Float64}
     dual_sol_eq::Vector{Float64}
     dual_sol_ineq::Vector{Float64}
-    fwd_map::Vector{Int}                # To reorder solution if we solved
-end                                     # using the conic interface
+    # Maps b-Ax∈K to ECOS duals
+    # .._ind maps a row to an index
+    # .._eq  is true if that index is into the equality duals
+    row_map_ind::Vector{Int}
+    row_map_eq::Vector{Bool}
+    # To reorder solution if we solved using the conic interface
+    fwd_map::Vector{Int}
+end
 ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         Int[],
                                         spzeros(0,0),
@@ -44,7 +50,8 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         Float64[], Float64[],
                                         :NotSolved, 0.0, 
                                         Float64[],
-                                        Float64[], Float64[], Int[])
+                                        Float64[], Float64[], 
+                                        Int[], Bool[], Int[])
 
 #############################################################################
 # Begin implementation of the MPB low-level interface 
@@ -117,9 +124,9 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
     m.nvar      = nvar                  # Number of variables
     m.nineq     = length(ineqidx)       # Number of inequalities Gx <=_K h
     m.neq       = length(eqidx)         # Number of equalities Ax = b
-    m.npos      = length(ineqidx)       # Number of ???
+    m.npos      = length(ineqidx)       # Number of positive orthant cone
     m.ncones    = 0                     # Number of SO cones
-    m.conedims  = Int[]                 # ???
+    m.conedims  = Int[]                 # Dimenions of SO cones
     m.G         = sparse(A[ineqidx,:])  # The G matrix (inequalties)
     m.A         = sparse(A[eqidx,:])    # The A matrix (equalities)
     m.c         = (sense == :Max) ? obj * -1 : obj[:] 
@@ -153,8 +160,8 @@ function optimize!(m::ECOSMathProgModel)
     # Extract solution
     ecos_prob = pointer_to_array(ecos_prob_ptr, 1)[1]
     m.primal_sol = pointer_to_array(ecos_prob.x, m.nvar)[:]
-    m.dual_sol_eq   = pointer_to_array(ecos_prob.y, m.neq)
-    m.dual_sol_ineq = pointer_to_array(ecos_prob.y, m.nineq)
+    m.dual_sol_eq   = pointer_to_array(ecos_prob.y, m.neq)[:]
+    m.dual_sol_ineq = pointer_to_array(ecos_prob.z, m.nineq)[:]
     m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)  
     cleanup(ecos_prob_ptr, 0)
 end
@@ -225,6 +232,22 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     ecos_A = zeromat(0,num_vars)
     ecos_b = Float64[]
 
+    # Mapping for duals
+    m.row_map_ind = zeros( Int, length(b))
+    m.row_map_eq  = zeros(Bool, length(b))
+    function update_map(cone_type, bool_val, cur_ind)
+        for (cone,idxs) in constr_cones
+            if cone == cone_type
+                for idx in idxs
+                    m.row_map_ind[idx] = cur_ind
+                    m.row_map_eq[idx]  = bool_val
+                    cur_ind += 1
+                end
+            end
+        end
+        cur_ind
+    end
+
     ###################################################################
     # PHASE ONE  -  MAP x ∈ K_2 to ECOS form, except SOC
     
@@ -284,6 +307,12 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
         cone == :NonNeg && append!(pos_rows, idxset)
         cone == :NonPos && append!(neg_rows, idxset)
     end
+    # Update mappings - eq, nonneg, nonpos
+     eq_cur_ind = length(ecos_b) + 1
+     eq_cur_ind = update_map(:Zero, true, eq_cur_ind)
+    neq_cur_ind = length(ecos_h) + 1
+    neq_cur_ind = update_map(:NonNeg, false, neq_cur_ind)
+    neq_cur_ind = update_map(:NonPos, false, neq_cur_ind)
     # Equality constraints / Zero cones
     ecos_A = vcat(ecos_A,  A[eq_rows,rev_map])
     ecos_b = vcat(ecos_b,  b[eq_rows])
@@ -336,6 +365,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
             all_rows   = vcat(all_rows,   idx_list)
         end
     end
+    update_map(:SOC, false, neq_cur_ind)
     ecos_G = vcat(ecos_G, A[all_rows,rev_map])
     ecos_h = vcat(ecos_h, b[all_rows])
 
@@ -358,5 +388,17 @@ end
 
 
 function getconicdual(m::ECOSMathProgModel)
-    m.dual_sol
+    #@show m.row_map_ind
+    #@show m.row_map_eq
+    duals = zeros(length(m.row_map_ind))
+    for (mpb_row,ecos_row) in enumerate(m.row_map_ind)
+        if m.row_map_eq[mpb_row]
+            # This MPB constraint ended up in ECOS equality block
+            duals[mpb_row] = m.dual_sol_eq[ecos_row]
+        else
+            # Ended up in ECOS inequality block
+            duals[mpb_row] = m.dual_sol_ineq[ecos_row]
+        end
+    end
+    return -duals  # All the results seem opposite sign, but why?
 end

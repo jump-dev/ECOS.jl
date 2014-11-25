@@ -8,6 +8,7 @@
 #############################################################################
 
 tests = ["direct.jl",
+         "options.jl",
          "mpb_linear.jl"]
 
 println("Running tests:")

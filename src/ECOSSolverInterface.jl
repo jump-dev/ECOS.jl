@@ -13,7 +13,9 @@ importall MathProgBase.MathProgSolverInterface
 # Define the MPB Solver and Model objects
 export ECOSSolver
 immutable ECOSSolver <: AbstractMathProgSolver
+    options
 end
+ECOSSolver(;kwargs...) = ECOSSolver(kwargs)
 
 type ECOSMathProgModel <: AbstractMathProgModel
     nvar::Int                           # Number of variables
@@ -41,8 +43,9 @@ type ECOSMathProgModel <: AbstractMathProgModel
     row_map_eq::Vector{Bool}
     # To reorder solution if we solved using the conic interface
     fwd_map::Vector{Int}
+    options
 end
-ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
+ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
                                         Int[],
                                         spzeros(0,0),
                                         spzeros(0,0),
@@ -51,7 +54,8 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
                                         :NotSolved, 0.0, 
                                         Float64[],
                                         Float64[], Float64[], 
-                                        Int[], Bool[], Int[])
+                                        Int[], Bool[], Int[],
+                                        kwargs)
 
 #############################################################################
 # Begin implementation of the MPB low-level interface 
@@ -62,7 +66,7 @@ ECOSMathProgModel() = ECOSMathProgModel(0,0,0,0,0,
 # - status
 # http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
 
-model(s::ECOSSolver) = ECOSMathProgModel()
+model(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
 
 # Loads the provided problem data to set up the linear programming problem:
 # min c'x
@@ -143,7 +147,7 @@ function optimize!(m::ECOSMathProgModel)
         m.npos, m.ncones, m.conedims,
         m.G, m.A,
         m.c[:],  # Seems to modify this
-        m.h, m.b)
+        m.h, m.b; m.options...)
 
     flag = solve(ecos_prob_ptr)
     if flag == ECOS_OPTIMAL

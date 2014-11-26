@@ -22,7 +22,34 @@ ECOS.jl will automatically setup the ECOS solver itself:
 
 The ECOS interface is completely wrapped: the package exports the functions `setup`, `solve`, and `cleanup`; it provides but does not export `ECOS_ver`. Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.
 
-ECOS.jl also supports the [JuliaOpt] **[MathProgBase]** standard solver interface. This interface can be used to solve linear programs using `loadproblem!` (see `test/mpb_lin.jl`) and SOCPs through `loadconicproblem!` ([documentation](http://mathprogbasejl.readthedocs.org/en/latest/conic.html),  `MathProgBase.jl/test/conicinterface.jl`). Thanks to this support ECOS can be used as a solver with both the **[JuMP]** and (in the very near future) **[Convex.jl]** modeling languages.
+ECOS.jl also supports the [JuliaOpt] **[MathProgBase]** standard solver interface.
+This interface can be used to solve LPs using `loadproblem!` and SOCPs through `loadconicproblem!` 
+([documentation](http://mathprogbasejl.readthedocs.org/en/latest/conic.html)).
+Thanks to this support ECOS can be used as a solver with both the **[JuMP]** and **[Convex.jl]** modeling languages.
+
+All ECOS solver options can be set through the direct interface and through MathProgBase.
+The list of options is defined the [`ecos.h` header](https://github.com/embotech/ecos/blob/master/include/ecos.h), which we reproduce here:
+```julia
+gamma          # scaling the final step length
+delta          # regularization parameter
+eps            # regularization threshold
+feastol        # primal/dual infeasibility tolerance
+abstol         # absolute tolerance on duality gap
+reltol         # relative tolerance on duality gap
+feastol_inacc  # primal/dual infeasibility relaxed tolerance
+abstol_inacc   # absolute relaxed tolerance on duality gap
+reltol_inacc   # relative relaxed tolerance on duality gap
+nitref				     # number of iterative refinement steps
+maxit          # maximum number of iterations
+verbose        # verbosity bool for PRINTLEVEL < 3
+```
+To use these settings you can either pass them as keyword arguments to `setup` (direct interface) or as arguments to the `ECOSSolver` constructor (MathProgBase interface), e.g.
+```julia
+# Direct
+my_prob = ECOS.setup(n, m, ..., c, h, b; maxit=10, feastol=1e-5)
+# MathProgBase (with JuMP)
+m = Model(solver=ECOS.ECOSSolver(maxit=10, feastol=1e-5))
+```
 
 ### JuMP example
 

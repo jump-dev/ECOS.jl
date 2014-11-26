@@ -25,6 +25,16 @@ macro ecos_ccall(func, args...)
     end
 end
 
+# @fieldtype
+# for 0.3 compatibility
+macro fieldtype(instance, field)
+    if VERSION < v"0.4-"
+        return :(fieldtype($instance, $field))
+    else
+        return :(fieldtype(typeof($instance), $field))
+    end
+end
+
 
 include("ECOSSolverInterface.jl")  # MathProgBase interface
 include("types.jl")  # All the types and constants defined in ecos.h
@@ -65,14 +75,14 @@ export setup, solve, cleanup
 function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int},Nothing),
                 Gpr::Vector{Float64}, Gjc::Vector{Int}, Gir::Vector{Int},
                 Apr::Union(Vector{Float64},Nothing), Ajc::Union(Vector{Int},Nothing), Air::Union(Vector{Int},Nothing),
-                c::Vector{Float64}, h::Vector{Float64}, b::Union(Vector{Float64},Nothing))
+                c::Vector{Float64}, h::Vector{Float64}, b::Union(Vector{Float64},Nothing); kwargs...)
     # Convert to canonical forms
     q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
     Apr = (Apr == nothing) ? convert(Ptr{Cdouble}, C_NULL) : Apr
     Ajc = (Ajc == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Ajc)
     Air = (Air == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Air)
     b = (b == nothing) ? convert(Ptr{Cdouble}, C_NULL) : b
-    problem = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork},
+    problem_ptr = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork},
         (Clong, Clong, Clong, Clong, Clong, Ptr{Clong},
          Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
          Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
@@ -81,13 +91,36 @@ function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int}
         Gpr, convert(Vector{Clong},Gjc), convert(Vector{Clong},Gir),
         Apr, Ajc, Air,
         c, h, b)
+
+    problem_ptr != C_NULL || error("ECOS failed to construct problem.")
+
+    if !isempty(kwargs)
+        problem = unsafe_load(problem_ptr)
+        problem.stgs != C_NULL || error("ECOS returned a malformed settings struct.")
+        settings = unsafe_load(problem.stgs)
+
+        options = Dict{Symbol, Any}()
+        for (k,v) in kwargs
+            options[k] = v
+        end
+
+        new_settings = Csettings([
+            setting in keys(options) ?
+            convert(@fieldtype(settings, setting), options[setting]) :
+            getfield(settings, setting)
+            for setting in names(settings)]...)
+
+        unsafe_store!(problem.stgs, new_settings)
+    end
+
+    problem_ptr
 end
 
 # setup  (more general interface)
 # A more tolerant version of the above method that doesn't require
 # user to fiddle with internals of the sparse matrix format
 # User can pass nothing as argument for A, b, and q
-function setup(n, m, p, l, ncones, q, G, A, c, h, b)
+function setup(n, m, p, l, ncones, q, G, A, c, h, b; options...)
     if A == nothing
         if b != nothing
             @assert length(b) == 0
@@ -115,7 +148,7 @@ function setup(n, m, p, l, ncones, q, G, A, c, h, b)
     setup(  n, m, p, l, ncones, q, 
             Gpr, Gjc, Gir,
             Apr, Ajc, Air,
-            c, h, b)
+            c, h, b; options...)
 end
 
 # solve

@@ -38,9 +38,9 @@ type ECOSMathProgModel <: AbstractMathProgModel
     dual_sol_ineq::Vector{Float64}
     # Maps b-Ax∈K to ECOS duals
     # .._ind maps a row to an index
-    # .._eq  is true if that index is into the equality duals
+    # .._type  is the original cone type of each row
     row_map_ind::Vector{Int}
-    row_map_eq::Vector{Bool}
+    row_map_type::Vector{Symbol}
     # To reorder solution if we solved using the conic interface
     fwd_map::Vector{Int}
     options
@@ -238,13 +238,13 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
 
     # Mapping for duals
     m.row_map_ind = zeros( Int, length(b))
-    m.row_map_eq  = zeros(Bool, length(b))
-    function update_map(cone_type, bool_val, cur_ind)
+    m.row_map_type  = Array(Symbol, length(b))
+    function update_map(cone_type, cur_ind)
         for (cone,idxs) in constr_cones
             if cone == cone_type
                 for idx in idxs
                     m.row_map_ind[idx] = cur_ind
-                    m.row_map_eq[idx]  = bool_val
+                    m.row_map_type[idx]  = cone_type
                     cur_ind += 1
                 end
             end
@@ -313,10 +313,10 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     end
     # Update mappings - eq, nonneg, nonpos
      eq_cur_ind = length(ecos_b) + 1
-     eq_cur_ind = update_map(:Zero, true, eq_cur_ind)
+     eq_cur_ind = update_map(:Zero, eq_cur_ind)
     neq_cur_ind = length(ecos_h) + 1
-    neq_cur_ind = update_map(:NonNeg, false, neq_cur_ind)
-    neq_cur_ind = update_map(:NonPos, false, neq_cur_ind)
+    neq_cur_ind = update_map(:NonNeg, neq_cur_ind)
+    neq_cur_ind = update_map(:NonPos, neq_cur_ind)
     # Equality constraints / Zero cones
     ecos_A = vcat(ecos_A,  A[eq_rows,rev_map])
     ecos_b = vcat(ecos_b,  b[eq_rows])
@@ -369,7 +369,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
             all_rows   = vcat(all_rows,   idx_list)
         end
     end
-    update_map(:SOC, false, neq_cur_ind)
+    update_map(:SOC, neq_cur_ind)
     ecos_G = vcat(ecos_G, A[all_rows,rev_map])
     ecos_h = vcat(ecos_h, b[all_rows])
 
@@ -396,13 +396,20 @@ function getconicdual(m::ECOSMathProgModel)
     #@show m.row_map_eq
     duals = zeros(length(m.row_map_ind))
     for (mpb_row,ecos_row) in enumerate(m.row_map_ind)
-        if m.row_map_eq[mpb_row]
+        cone = m.row_map_type[mpb_row]
+        # Not well understood why we need to flip signs
+        # of Zero and SOC constraints.
+        if cone == :Zero
             # This MPB constraint ended up in ECOS equality block
-            duals[mpb_row] = m.dual_sol_eq[ecos_row]
+            duals[mpb_row] = -m.dual_sol_eq[ecos_row]
         else
             # Ended up in ECOS inequality block
-            duals[mpb_row] = m.dual_sol_ineq[ecos_row]
+            if cone == :NonPos || cone == :SOC
+                duals[mpb_row] = -m.dual_sol_ineq[ecos_row]
+            else
+                duals[mpb_row] = m.dual_sol_ineq[ecos_row]
+            end
         end
     end
-    return -duals  # All the results seem opposite sign, but why?
+    return duals
 end

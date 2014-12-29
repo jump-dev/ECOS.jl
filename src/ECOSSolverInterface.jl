@@ -54,7 +54,7 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
                                         :NotSolved, 0.0, 
                                         Float64[],
                                         Float64[], Float64[], 
-                                        Int[], Bool[], Int[],
+                                        Int[], Symbol[], Int[],
                                         kwargs)
 
 #############################################################################

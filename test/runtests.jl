@@ -23,3 +23,6 @@ import ECOS
 include(joinpath(Pkg.dir("MathProgBase"),"test","conicinterface.jl"))
 coniclineartest(ECOS.ECOSSolver(), duals=true)
 conicSOCtest(ECOS.ECOSSolver(), duals=true)
+
+include(joinpath(Pkg.dir("MathProgBase"),"test","quadprog.jl"))
+socptest(MathProgBase.ConicSolverWrapper(ECOS.ECOSSolver()))

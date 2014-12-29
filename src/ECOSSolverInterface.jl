@@ -177,8 +177,12 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 #############################################################################
 # Begin implementation of the MPB conic interface 
 # Implements
+# - supportedcones
 # - loadconicproblem!
+# - getconicdual
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
+
+supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC]
 
 function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     # If A is sparse, we should use an appropriate "zeros"

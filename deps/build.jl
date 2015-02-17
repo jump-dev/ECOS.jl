@@ -20,7 +20,8 @@ prefix = joinpath(BinDeps.depsdir(ecos),"usr")
 srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-$version")
 
 provides(Binaries, URI("http://sourceforge.net/projects/juliadeps-win/files/ecos-$version.7z"),
-    [ecos], unpacked_dir="usr$WORD_SIZE/bin", os = :Windows)
+    [ecos], unpacked_dir="usr$WORD_SIZE/bin", os = :Windows,
+    SHA="add47e8b2b14a67c5681a5a77a4dafe0bc4d5efacb38f8c7dffafea79d49d89d")
 
 # We'll keep this around for emergencies, but OSX users should be able to use Homebrew
 provides(SimpleBuild,

@@ -369,7 +369,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
         if cone == :SOC
             num_SOC_cones += 1
             push!(SOC_conedims, length(idxs))
-            idx_list   = Int[idxs]
+            idx_list   = Int[idxs;]
             all_rows   = vcat(all_rows,   idx_list)
         end
     end

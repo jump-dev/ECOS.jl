@@ -10,7 +10,7 @@
 module ECOS
 
 # Try to load the binary dependency
-if isfile(joinpath(Pkg.dir("ECOS"),"deps","deps.jl"))
+if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
     include("../deps/deps.jl")
 else
     error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")

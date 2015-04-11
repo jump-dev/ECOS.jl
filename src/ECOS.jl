@@ -9,6 +9,8 @@
 
 module ECOS
 
+using Compat
+
 # Try to load the binary dependency
 if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
     include("../deps/deps.jl")
@@ -108,7 +110,7 @@ function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int}
             setting in keys(options) ?
             convert(@fieldtype(settings, setting), options[setting]) :
             getfield(settings, setting)
-            for setting in names(settings)]...)
+            for setting in fieldnames(settings)]...)
 
         unsafe_store!(problem.stgs, new_settings)
     end

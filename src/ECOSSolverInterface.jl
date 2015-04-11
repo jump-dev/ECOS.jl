@@ -307,7 +307,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
         cone == :SOC  && continue  # Handle later
-        idxset = Int[idxs]
+        idxset = Int[idxs;]
         if cone == :Zero
             append!(eq_rows, idxset)
             continue

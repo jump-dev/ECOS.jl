@@ -19,7 +19,7 @@ provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/$version.tar.gz"
 prefix = joinpath(BinDeps.depsdir(ecos),"usr")
 srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-$version")
 
-provides(Binaries, URI("https://cache.e.ip.saba.us/http://sourceforge.net/projects/juliadeps-win/files/ecos-$version.7z/download"),
+provides(Binaries, URI("https://cache.e.ip.saba.us/http://sourceforge.net/projects/juliadeps-win/files/ecos-$version.7z"),
     [ecos], unpacked_dir="usr$WORD_SIZE/bin", os = :Windows,
     SHA="add47e8b2b14a67c5681a5a77a4dafe0bc4d5efacb38f8c7dffafea79d49d89d")
 

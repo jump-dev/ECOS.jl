@@ -4,7 +4,10 @@
 [![Coverage Status](https://img.shields.io/coveralls/JuliaOpt/ECOS.jl.svg)](https://coveralls.io/r/JuliaOpt/ECOS.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/bnvddmeevtrmjyc2/branch/master)](https://ci.appveyor.com/project/mlubin/ecos-jl/branch/master)
 
-Julia wrapper for the [ECOS](https://github.com/ifa-ethz/ecos) embeddable second-order cone problem (SOCP) interior point solver.
+[![ECOS](http://pkg.julialang.org/badges/ECOS_0.3.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=release)
+[![ECOS](http://pkg.julialang.org/badges/ECOS_0.4.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=nightly)
+
+Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable second-order cone problem (SOCP) interior point solver.
 
 ## Installation
 
@@ -39,7 +42,7 @@ reltol         # relative tolerance on duality gap
 feastol_inacc  # primal/dual infeasibility relaxed tolerance
 abstol_inacc   # absolute relaxed tolerance on duality gap
 reltol_inacc   # relative relaxed tolerance on duality gap
-nitref				     # number of iterative refinement steps
+nitref         # number of iterative refinement steps
 maxit          # maximum number of iterations
 verbose        # verbosity bool for PRINTLEVEL < 3
 ```
@@ -82,6 +85,6 @@ println(getValue(take))
 
 [MathProgBase]: https://github.com/JuliaOpt/MathProgBase.jl
 [JuMP]: https://github.com/JuliaOpt/JuMP.jl
-[Convex.jl]: https://github.com/cvxgrp/Convex.jl
+[Convex.jl]: https://github.com/JuliaOpt/Convex.jl
 [Homebrew.jl]: https://github.com/JuliaLang/Homebrew.jl
 [JuliaOpt]: http://juliaopt.org

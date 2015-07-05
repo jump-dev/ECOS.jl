@@ -133,12 +133,12 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
     m.conedims  = Int[]                 # Dimenions of SO cones
     m.G         = sparse(A[ineqidx,:])  # The G matrix (inequalties)
     m.A         = sparse(A[eqidx,:])    # The A matrix (equalities)
-    m.c         = (sense == :Max) ? obj * -1 : obj[:] 
+    m.c         = (sense == :Max) ? obj * -1 : copy(obj)
                                         # The objective coeffs (always min)
     m.orig_sense = sense                # Original objective sense
     m.h         = ineqbnd               # RHS for inequality 
     m.b         = eqbnd                 # RHS for equality
-    m.fwd_map   = [1:nvar]              # Identity mapping
+    m.fwd_map   = collect(1:nvar)       # Identity mapping
 end
 
 function optimize!(m::ECOSMathProgModel)
@@ -241,14 +241,14 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     ecos_b = Float64[]
 
     # Mapping for duals
-    m.row_map_ind = zeros( Int, length(b))
+    m.row_map_ind = zeros(Int, length(b))
     m.row_map_type  = Array(Symbol, length(b))
     function update_map(cone_type, cur_ind)
         for (cone,idxs) in constr_cones
             if cone == cone_type
                 for idx in idxs
                     m.row_map_ind[idx] = cur_ind
-                    m.row_map_type[idx]  = cone_type
+                    m.row_map_type[idx] = cone_type
                     cur_ind += 1
                 end
             end
@@ -328,8 +328,8 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     ecos_h = vcat(ecos_h,  b[pos_rows])
     ecos_G = vcat(ecos_G, -A[neg_rows,rev_map])  # b-a'x <= 0 - flip sign, 
     ecos_h = vcat(ecos_h, -b[neg_rows])          # then maps to a row in h-Gx
-    G_row         += length(pos_rows) + length(neg_rows)
-    num_pos_orth  += length(pos_rows) + length(neg_rows)
+    G_row        += length(pos_rows) + length(neg_rows)
+    num_pos_orth += length(pos_rows) + length(neg_rows)
 
     ###################################################################
     # PHASE THREE  -  MAP x ∈ SOC to ECOS form
@@ -396,8 +396,6 @@ end
 
 
 function getconicdual(m::ECOSMathProgModel)
-    #@show m.row_map_ind
-    #@show m.row_map_eq
     duals = zeros(length(m.row_map_ind))
     for (mpb_row,ecos_row) in enumerate(m.row_map_ind)
         cone = m.row_map_type[mpb_row]

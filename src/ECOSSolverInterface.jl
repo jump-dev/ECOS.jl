@@ -307,7 +307,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
         cone == :SOC  && continue  # Handle later
-        idxset = Int[idxs;]
+        idxset = collect(idxs)::Vector{Int}
         if cone == :Zero
             append!(eq_rows, idxset)
             continue
@@ -362,14 +362,14 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
 
     ###################################################################
     # PHASE FOUR  -  MAP b-Ax ∈ SOC to ECOS form
-    
+
     # Collect all the rows we'll be appending to G,h
     all_rows = Int[]
     for (cone,idxs) in constr_cones
         if cone == :SOC
             num_SOC_cones += 1
             push!(SOC_conedims, length(idxs))
-            idx_list   = Int[idxs;]
+            idx_list   = collect(idxs)::Vector{Int}
             all_rows   = vcat(all_rows,   idx_list)
         end
     end

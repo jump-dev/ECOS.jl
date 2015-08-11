@@ -399,14 +399,12 @@ function getconicdual(m::ECOSMathProgModel)
     duals = zeros(length(m.row_map_ind))
     for (mpb_row,ecos_row) in enumerate(m.row_map_ind)
         cone = m.row_map_type[mpb_row]
-        # Not well understood why we need to flip signs
-        # of Zero and SOC constraints.
         if cone == :Zero
             # This MPB constraint ended up in ECOS equality block
-            duals[mpb_row] = -m.dual_sol_eq[ecos_row]
+            duals[mpb_row] = m.dual_sol_eq[ecos_row]
         else
             # Ended up in ECOS inequality block
-            if cone == :NonPos || cone == :SOC
+            if cone == :NonPos
                 duals[mpb_row] = -m.dual_sol_ineq[ecos_row]
             else
                 duals[mpb_row] = m.dual_sol_ineq[ecos_row]

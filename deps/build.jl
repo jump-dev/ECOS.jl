@@ -9,11 +9,8 @@ ecos = library_dependency("ecos", aliases=["libecos"])
     provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
 end
 
-# This is the git commit that includes our merged patches as of 08/05/2014
-# This is safer than unpacking from master which may cause ECOS.jl to
-# not work properly
-version = "e05a605588c38ad72e843f36af17f8f84e4e2ccb"
-provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/$version.tar.gz"),
+version = "2.0.2"
+provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/v$version.tar.gz"),
     [ecos], os = :Unix, unpacked_dir="ecos-$version")
 
 prefix = joinpath(BinDeps.depsdir(ecos),"usr")

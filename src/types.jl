@@ -19,6 +19,7 @@ const ECOS_INACC_OFFSET = 10  # Offset exitflag at inaccurate results
 const ECOS_MAXIT        = -1  # Maximum number of iterations reached
 const ECOS_NUMERICS     = -2  # Search direction unreliable
 const ECOS_OUTCONE      = -3  # s or z got outside the cone, numerics?
+const ECOS_SIGINT       = -4  # solver interrupted by a signal/ctrl-c
 const ECOS_FATAL        = -7  # Unknown problem in solver
 
 
@@ -134,6 +135,9 @@ immutable Csettings
     nitref::Clong
     maxit::Clong
     verbose::Clong
+    max_bk_iter::Clong
+    bk_scale::Cdouble
+    centrality::Cdouble
 end
 
 immutable Cpwork
@@ -198,6 +202,12 @@ immutable Cpwork
     hresx::Cdouble
     hresy::Cdouble
     hresz::Cdouble
+
+    # norm iterates
+    nx::Cdouble
+    ny::Cdouble
+    nz::Cdouble
+    ns::Cdouble
 
     # temporary storage
     cx::Cdouble

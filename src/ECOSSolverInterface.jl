@@ -144,7 +144,7 @@ end
 function optimize!(m::ECOSMathProgModel)
     ecos_prob_ptr = setup(
         m.nvar, m.nineq, m.neq,
-        m.npos, m.ncones, m.conedims,
+        m.npos, m.ncones, m.conedims, 0,
         m.G, m.A,
         m.c[:],  # Seems to modify this
         m.h, m.b; m.options...)

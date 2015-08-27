@@ -9,19 +9,16 @@ ecos = library_dependency("ecos", aliases=["libecos"])
     provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
 end
 
-# This is the git commit that includes our merged patches as of 08/05/2014
-# This is safer than unpacking from master which may cause ECOS.jl to
-# not work properly
-version = "e05a605588c38ad72e843f36af17f8f84e4e2ccb"
-provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/$version.tar.gz"),
+version = "2.0.2"
+provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/v$version.tar.gz"),
     [ecos], os = :Unix, unpacked_dir="ecos-$version")
 
 prefix = joinpath(BinDeps.depsdir(ecos),"usr")
 srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-$version")
 
 provides(Binaries, URI("https://cache.e.ip.saba.us/https://bintray.com/artifact/download/tkelman/generic/ecos-$version.7z"),
-    [ecos], unpacked_dir="usr$WORD_SIZE/bin", os = :Windows,
-    SHA="add47e8b2b14a67c5681a5a77a4dafe0bc4d5efacb38f8c7dffafea79d49d89d")
+    [ecos], unpacked_dir="usr/bin$WORD_SIZE", os = :Windows,
+    SHA="b90254220a9a63cba08700f3664519d360f45d363454e5c107e6f30e144a60a1")
 
 # We'll keep this around for emergencies, but OSX users should be able to use Homebrew
 provides(SimpleBuild,

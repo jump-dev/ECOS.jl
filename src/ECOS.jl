@@ -62,6 +62,7 @@ export setup, solve, cleanup
 #   q       ncones-long vector of the length of the index sets of the SOCs
 #               e.g. cone 1 is indices 4:6, cone 2 is indices 7:10
 #                    ->  q = [3, 4]
+#   e       Number of exponential cones present in problem
 #   Gpr, Gjc, Gir
 #           Non-zeros, column indices, and the row index arrays, respectively,
 #           for the matrix G represented in column compressed storage (CCS) format
@@ -74,7 +75,7 @@ export setup, solve, cleanup
 #   b       RHS for equality constraints, length(b) == b (can be nothing)
 # Returns a pointer to the ECOS pwork structure (Cpwork in ECOS.jl). See
 # types.jl for more information.
-function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int},Nothing),
+function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int},Nothing), e::Int,
                 Gpr::Vector{Float64}, Gjc::Vector{Int}, Gir::Vector{Int},
                 Apr::Union(Vector{Float64},Nothing), Ajc::Union(Vector{Int},Nothing), Air::Union(Vector{Int},Nothing),
                 c::Vector{Float64}, h::Vector{Float64}, b::Union(Vector{Float64},Nothing); kwargs...)
@@ -85,11 +86,11 @@ function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int}
     Air = (Air == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Air)
     b = (b == nothing) ? convert(Ptr{Cdouble}, C_NULL) : b
     problem_ptr = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork},
-        (Clong, Clong, Clong, Clong, Clong, Ptr{Clong},
+        (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Clong,
          Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
          Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
          Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}),
-        n, m, p, l, ncones, q,
+        n, m, p, l, ncones, q, e,
         Gpr, convert(Vector{Clong},Gjc), convert(Vector{Clong},Gir),
         Apr, Ajc, Air,
         c, h, b)
@@ -122,7 +123,7 @@ end
 # A more tolerant version of the above method that doesn't require
 # user to fiddle with internals of the sparse matrix format
 # User can pass nothing as argument for A, b, and q
-function setup(n, m, p, l, ncones, q, G, A, c, h, b; options...)
+function setup(n, m, p, l, ncones, q, e, G, A, c, h, b; options...)
     if A == nothing
         if b != nothing
             @assert length(b) == 0
@@ -147,7 +148,7 @@ function setup(n, m, p, l, ncones, q, G, A, c, h, b; options...)
     Gjc = sparseG.colptr - 1  # C is 0-based
     Gir = sparseG.rowval - 1
 
-    setup(  n, m, p, l, ncones, q, 
+    setup(  n, m, p, l, ncones, q, e,
             Gpr, Gjc, Gir,
             Apr, Ajc, Air,
             c, h, b; options...)
@@ -172,7 +173,7 @@ end
 # Returns the version of ECOS in use
 function ver()
     ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{Uint8}, ())
-    return bytestring(pointer_to_array(ver_ptr, 7))
+    return bytestring(ver_ptr)
 end
 
 end # module

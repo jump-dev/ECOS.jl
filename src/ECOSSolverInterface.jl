@@ -24,6 +24,7 @@ type ECOSMathProgModel <: AbstractMathProgModel
     npos::Int                           # Number of positive orthant cones
     ncones::Int                         # Number of SO cones
     conedims::Vector{Int}               # Dimension of each SO cone
+    nexp_cones::Int                     # Number of exponential cones
     G::SparseMatrixCSC{Float64,Int}     # The G matrix (inequalties)
     A::SparseMatrixCSC{Float64,Int}     # The A matrix (equalities)
     c::Vector{Float64}                  # The objective coeffs (always min)
@@ -46,7 +47,7 @@ type ECOSMathProgModel <: AbstractMathProgModel
     options
 end
 ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
-                                        Int[],
+                                        Int[],0,
                                         spzeros(0,0),
                                         spzeros(0,0),
                                         Float64[], :Min,
@@ -144,7 +145,7 @@ end
 function optimize!(m::ECOSMathProgModel)
     ecos_prob_ptr = setup(
         m.nvar, m.nineq, m.neq,
-        m.npos, m.ncones, m.conedims, 0,
+        m.npos, m.ncones, m.conedims, m.nexp_cones,
         m.G, m.A,
         m.c[:],  # Seems to modify this
         m.h, m.b; m.options...)
@@ -182,14 +183,14 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 # - getconicdual
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
-supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC]
+supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:ExpPrimal]
 
 function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     # If A is sparse, we should use an appropriate "zeros"
     const zeromat = isa(A,SparseMatrixCSC) ? spzeros : zeros
 
-    # We don't support SOCRotated, SDP, or Exp*
-    bad_cones = [:SOCRotated, :SDP, :ExpPrimal, :ExpDual]
+    # We don't support SOCRotated, SDP, or ExpDual
+    bad_cones = [:SOCRotated, :SDP, :ExpDual]
     for cone_vars in constr_cones
         cone_vars[1] in bad_cones && error("Cone type $(cone_vars[1]) not supported")
     end
@@ -213,16 +214,16 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     #
     # Approach:
     # 0. Figure out a mapping between MPB and ECOS
-    # 1. Map non-SOC variables to ECOS form
-    # 2. Map non-SOC constraints to ECOS form
-    # 3. Map SOC variables to ECOS form
-    # 4. Map SOC constraints to ECOS form
+    # 1. Map non-SOC/Exp variables to ECOS form
+    # 2. Map non-SOC/Exp constraints to ECOS form
+    # 3. Map SOC variables and constraints to ECOS form
+    # 4. Map Exp variables and constraints to ECOS form
 
     # Allocate space for the ECOS variables
     num_vars = length(c)
     fwd_map = Array(Int,    num_vars)  # Will be used for SOCs
     rev_map = Array(Int,    num_vars)  # Need to restore sol. vec.
-    idxcone = Array(Symbol, num_vars)  # We'll uses this for non-SOCs
+    idxcone = Array(Symbol, num_vars)  # We'll uses this for non-SOC/Exp
 
     # Now build the mapping between MPB variables and ECOS variables
     pos = 1
@@ -257,7 +258,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     end
 
     ###################################################################
-    # PHASE ONE  -  MAP x ∈ K_2 to ECOS form, except SOC
+    # PHASE ONE  -  MAP x ∈ K_2 to ECOS form, except SOC/Exp
     
     # If a variable is in :Zero cone, fix at 0 with equality constraint.
     for j = 1:num_vars
@@ -271,7 +272,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
 
     # G matrix:
     # * 1 row ∀ :NonNeg & :NonPos cones
-    # * 1 row ∀ variable in :SOC cone
+    # * 1 row ∀ variable in SOC/Exp cones
     # We will only handle the first case here, the rest in phase 3.
     num_G_row_negpos = 0
     for j = 1:num_vars
@@ -298,7 +299,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     @assert G_row == num_pos_orth + 1
     
     ###################################################################
-    # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form, except SOC
+    # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form, except SOC/Exp
     
     # Zero rows for Ax=b, NonNegPos rows to append to G,h
      eq_rows = Int[]
@@ -306,7 +307,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     neg_rows = Int[]
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
-        cone == :SOC  && continue  # Handle later
+        (cone == :SOC || cone == :ExpPrimal) && continue  # Handle later
         idxset = collect(idxs)::Vector{Int}
         if cone == :Zero
             append!(eq_rows, idxset)
@@ -332,15 +333,19 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     num_pos_orth += length(pos_rows) + length(neg_rows)
 
     ###################################################################
-    # PHASE THREE  -  MAP x ∈ SOC to ECOS form
+    # PHASE THREE  -  MAP SOC variables and constraints to ECOS form
     
-    # Handle the :SOC variable cones
+    # Handle the SOC variable cones
     # MPB  form: vector of var (y,x) is in the SOC ||x|| <= y
     # ECOS form: h - Gx ∈ Q  -->  0 - Ix ∈ Q
     num_G_row_soc = 0
+    num_G_row_exp = 0
     for j = 1:num_vars
-        (idxcone[j] != :SOC) && continue
-        num_G_row_soc += 1
+        if idxcone[j] == :SOC
+            num_G_row_soc += 1
+        elseif idxcone[j] == :ExpPrimal
+            num_G_row_exp += 1
+        end
     end
     ecos_G = vcat(ecos_G, zeromat(num_G_row_soc,num_vars))
     ecos_h = vcat(ecos_h,   zeros(num_G_row_soc))
@@ -360,9 +365,8 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     end
     @assert G_row == num_pos_orth + num_G_row_soc + 1
 
-    ###################################################################
-    # PHASE FOUR  -  MAP b-Ax ∈ SOC to ECOS form
 
+    # Handle the SOC constraint cones
     # Collect all the rows we'll be appending to G,h
     all_rows = Int[]
     for (cone,idxs) in constr_cones
@@ -373,9 +377,52 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
             all_rows   = vcat(all_rows,   idx_list)
         end
     end
-    update_map(:SOC, neq_cur_ind)
+    neq_cur_ind = update_map(:SOC, neq_cur_ind)
     ecos_G = vcat(ecos_G, A[all_rows,rev_map])
     ecos_h = vcat(ecos_h, b[all_rows])
+
+    ###################################################################
+    # PHASE FOUR  -  MAP Exp variables and constraints to ECOS form
+
+    # Note: The MPB definition of the ExpPrimal cone and the ECOS
+    # defintions swap the 2nd and 3rd components, so we have to
+    # manually permute the indices.
+
+    num_exp_cones = 0
+    ecos_G = vcat(ecos_G, zeromat(num_G_row_exp,num_vars))
+    ecos_h = vcat(ecos_h,   zeros(num_G_row_exp))
+
+    G_row += sum(all_rows)
+    for (cone, idxs) in var_cones
+        cone != :ExpPrimal && continue
+        # Found a new Exp
+        num_exp_cones += 1
+        @assert length(idxs) == 3
+        # Add the entries in permuted order
+        ecos_G[G_row,fwd_map[idxs[1]]] = -1.0
+        ecos_G[G_row+2,fwd_map[idxs[2]]] = -1.0
+        ecos_G[G_row+1,fwd_map[idxs[3]]] = -1.0
+        G_row += 3
+    end
+    @assert G_row == num_pos_orth + num_G_row_soc + sum(all_rows) + num_G_row_exp + 1
+
+    exp_rows = Int[]
+    for (cone,idxs) in constr_cones
+        if cone == :ExpPrimal
+            num_exp_cones += 1
+            @assert length(idxs) == 3
+            append!(exp_rows, [idxs[1],idxs[3],idxs[2]])
+
+            # override update_map to handle the permutation
+            m.row_map_type[idxs] = :ExpPrimal
+            m.row_map_ind[idxs[1]] = neq_cur_ind
+            m.row_map_ind[idxs[3]] = neq_cur_ind+1
+            m.row_map_ind[idxs[2]] = neq_cur_ind+2
+            neq_cur_ind += 1
+        end
+    end
+    ecos_G = vcat(ecos_G, A[exp_rows,rev_map])
+    ecos_h = vcat(ecos_h, b[exp_rows])
 
     ###################################################################
     # Store in the ECOS structure
@@ -385,6 +432,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     m.npos          = num_pos_orth      # Num ineq. constr. in +ve orthant
     m.ncones        = num_SOC_cones     # Num second-order cones
     m.conedims      = SOC_conedims      # Num contr. in each SOC
+    m.nexp_cones    = num_exp_cones     # Num exponential cones
     m.G             = ecos_G
     m.A             = ecos_A
     m.c             = ecos_c

@@ -159,6 +159,8 @@ function optimize!(m::ECOSMathProgModel)
         m.solve_stat = :Unbounded
     elseif flag == ECOS_MAXIT
         m.solve_stat = :UserLimit
+    elseif flag == ECOS_OPTIMAL + ECOS_INACC_OFFSET
+        m.solve_stat = :Suboptimal
     else
         m.solve_stat = :Error
     end

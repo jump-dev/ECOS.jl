@@ -4,8 +4,8 @@
 [![Coverage Status](https://img.shields.io/coveralls/JuliaOpt/ECOS.jl.svg)](https://coveralls.io/r/JuliaOpt/ECOS.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/bnvddmeevtrmjyc2/branch/master)](https://ci.appveyor.com/project/mlubin/ecos-jl/branch/master)
 
-[![ECOS](http://pkg.julialang.org/badges/ECOS_0.3.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=release)
-[![ECOS](http://pkg.julialang.org/badges/ECOS_0.4.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=nightly)
+[![ECOS](http://pkg.julialang.org/badges/ECOS_0.3.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.3)
+[![ECOS](http://pkg.julialang.org/badges/ECOS_0.4.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.4)
 
 Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable second-order cone problem (SOCP) interior point solver.
 

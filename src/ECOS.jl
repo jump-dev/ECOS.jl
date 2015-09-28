@@ -56,7 +56,7 @@ export setup, solve, cleanup
 # Provide ECOS with a problem in the form
 # min c'x
 # st  A*x = b
-#     G*x in_K h, 
+#     G*x in_K h,
 #       or equivalently  h - G*x in K
 #       or equivalently  G*x + s = h, s in K
 # K is the product of R+ and multiple second-order cones, with the
@@ -65,7 +65,7 @@ export setup, solve, cleanup
 #   n       Number of variables == length(x)
 #   m       Number of inequality constraints == length(h)
 #   p       Number of equality constraints == length(b)  (can be 0)
-#   l       Dimension of the positive orthant, 
+#   l       Dimension of the positive orthant,
 #               i.e. the first l elements of s are >= 0
 #   ncones  Number of second-order cones present in K
 #   q       ncones-long vector of the length of the index sets of the SOCs
@@ -84,10 +84,10 @@ export setup, solve, cleanup
 #   b       RHS for equality constraints, length(b) == b (can be nothing)
 # Returns a pointer to the ECOS pwork structure (Cpwork in ECOS.jl). See
 # types.jl for more information.
-function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union(Vector{Int},Nothing), e::Int,
+function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::@compat(Union{Vector{Int},Void}), e::Int,
                 Gpr::Vector{Float64}, Gjc::Vector{Int}, Gir::Vector{Int},
-                Apr::Union(Vector{Float64},Nothing), Ajc::Union(Vector{Int},Nothing), Air::Union(Vector{Int},Nothing),
-                c::Vector{Float64}, h::Vector{Float64}, b::Union(Vector{Float64},Nothing); kwargs...)
+                Apr::@compat(Union{Vector{Float64},Void}), Ajc::@compat(Union{Vector{Int},Void}), Air::@compat(Union{Vector{Int},Void}),
+                c::Vector{Float64}, h::Vector{Float64}, b::@compat(Union{Vector{Float64},Void}); kwargs...)
     # Convert to canonical forms
     q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
     Apr = (Apr == nothing) ? convert(Ptr{Cdouble}, C_NULL) : Apr
@@ -181,7 +181,7 @@ end
 # ver  [not exported]
 # Returns the version of ECOS in use
 function ver()
-    ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{Uint8}, ())
+    ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{UInt8}, ())
     return bytestring(ver_ptr)
 end
 

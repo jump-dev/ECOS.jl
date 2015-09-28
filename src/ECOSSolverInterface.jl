@@ -7,7 +7,7 @@
 # MathProgBase.jl interface for the ECOS.jl solver wrapper
 #############################################################################
 
-importall MathProgBase.MathProgSolverInterface
+importall MathProgBase.SolverInterface
 
 #############################################################################
 # Define the MPB Solver and Model objects
@@ -29,7 +29,7 @@ type ECOSMathProgModel <: AbstractMathProgModel
     A::SparseMatrixCSC{Float64,Int}     # The A matrix (equalities)
     c::Vector{Float64}                  # The objective coeffs (always min)
     orig_sense::Symbol                  # Original objective sense
-    h::Vector{Float64}                  # RHS for inequality 
+    h::Vector{Float64}                  # RHS for inequality
     b::Vector{Float64}                  # RHS for equality
     # Post-solve
     solve_stat::Symbol
@@ -52,14 +52,14 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
                                         spzeros(0,0),
                                         Float64[], :Min,
                                         Float64[], Float64[],
-                                        :NotSolved, 0.0, 
+                                        :NotSolved, 0.0,
                                         Float64[],
-                                        Float64[], Float64[], 
+                                        Float64[], Float64[],
                                         Int[], Symbol[], Int[],
                                         kwargs)
 
 #############################################################################
-# Begin implementation of the MPB low-level interface 
+# Begin implementation of the MPB low-level interface
 # Implements
 # - model
 # - loadproblem!
@@ -77,7 +77,7 @@ model(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
 function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
     (nvar = length(collb)) == length(colub) || error("Unequal lengths for column bounds")
     (nrow = length(rowlb)) == length(rowub) || error("Unequal lengths for row bounds")
-    
+
     # Turn variable bounds into constraints
     # Inefficient, because keeps allocating memory!
     # Would need to batch, get tricky...
@@ -137,7 +137,7 @@ function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, 
     m.c         = (sense == :Max) ? obj * -1 : copy(obj)
                                         # The objective coeffs (always min)
     m.orig_sense = sense                # Original objective sense
-    m.h         = ineqbnd               # RHS for inequality 
+    m.h         = ineqbnd               # RHS for inequality
     m.b         = eqbnd                 # RHS for equality
     m.fwd_map   = collect(1:nvar)       # Identity mapping
 end
@@ -169,7 +169,7 @@ function optimize!(m::ECOSMathProgModel)
     m.primal_sol = pointer_to_array(ecos_prob.x, m.nvar)[:]
     m.dual_sol_eq   = pointer_to_array(ecos_prob.y, m.neq)[:]
     m.dual_sol_ineq = pointer_to_array(ecos_prob.z, m.nineq)[:]
-    m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)  
+    m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
     cleanup(ecos_prob_ptr, 0)
 end
 
@@ -178,7 +178,7 @@ getobjval(m::ECOSMathProgModel) = m.obj_val
 getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 
 #############################################################################
-# Begin implementation of the MPB conic interface 
+# Begin implementation of the MPB conic interface
 # Implements
 # - supportedcones
 # - loadconicproblem!
@@ -261,7 +261,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
 
     ###################################################################
     # PHASE ONE  -  MAP x ∈ K_2 to ECOS form, except SOC/Exp
-    
+
     # If a variable is in :Zero cone, fix at 0 with equality constraint.
     for j = 1:num_vars
         idxcone[j] != :Zero && continue
@@ -299,10 +299,10 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
         end
     end
     @assert G_row == num_pos_orth + 1
-    
+
     ###################################################################
     # PHASE TWO  -  MAP b-Ax ∈ K_1 to ECOS form, except SOC/Exp
-    
+
     # Zero rows for Ax=b, NonNegPos rows to append to G,h
      eq_rows = Int[]
     pos_rows = Int[]
@@ -329,14 +329,14 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
     ecos_b = vcat(ecos_b,  b[eq_rows])
     ecos_G = vcat(ecos_G,  A[pos_rows,rev_map])
     ecos_h = vcat(ecos_h,  b[pos_rows])
-    ecos_G = vcat(ecos_G, -A[neg_rows,rev_map])  # b-a'x <= 0 - flip sign, 
+    ecos_G = vcat(ecos_G, -A[neg_rows,rev_map])  # b-a'x <= 0 - flip sign,
     ecos_h = vcat(ecos_h, -b[neg_rows])          # then maps to a row in h-Gx
     G_row        += length(pos_rows) + length(neg_rows)
     num_pos_orth += length(pos_rows) + length(neg_rows)
 
     ###################################################################
     # PHASE THREE  -  MAP SOC variables and constraints to ECOS form
-    
+
     # Handle the SOC variable cones
     # MPB  form: vector of var (y,x) is in the SOC ||x|| <= y
     # ECOS form: h - Gx ∈ Q  -->  0 - Ix ∈ Q

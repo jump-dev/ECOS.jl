@@ -7,6 +7,8 @@
 # Contains the wrapper itself
 #############################################################################
 
+isdefined(Base, :__precompile__) && __precompile__()
+
 module ECOS
 
 using Compat

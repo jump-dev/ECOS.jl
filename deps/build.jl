@@ -11,14 +11,15 @@ ecos = library_dependency("ecos", aliases=["libecos"])
     provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
 end
 
-version = "2.0.2"
+version = "2.0.4"
+win_version = "2.0.2"
 provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/v$version.tar.gz"),
     [ecos], os = :Unix, unpacked_dir="ecos-$version")
 
 prefix = joinpath(BinDeps.depsdir(ecos),"usr")
 srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-$version")
 
-provides(Binaries, URI("https://cache.e.ip.saba.us/https://bintray.com/artifact/download/tkelman/generic/ecos-$version.7z"),
+provides(Binaries, URI("https://cache.e.ip.saba.us/https://bintray.com/artifact/download/tkelman/generic/ecos-$win_version.7z"),
     [ecos], unpacked_dir="usr/bin$WORD_SIZE", os = :Windows,
     SHA="b90254220a9a63cba08700f3664519d360f45d363454e5c107e6f30e144a60a1")
 

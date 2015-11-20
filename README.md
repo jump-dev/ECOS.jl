@@ -23,7 +23,7 @@ ECOS.jl will automatically setup the ECOS solver itself:
 
 ## Usage
 
-The ECOS interface is completely wrapped: the package exports the functions `setup`, `solve`, and `cleanup`; it provides but does not export `ECOS_ver`. Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.
+The ECOS interface is completely wrapped. ECOS functions corresponding to the C API are available as `ECOS.setup`, `ECOS.solve`, `ECOS.cleanup`, and `ECOS.ver` (these are not exported from the module). Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.
 
 ECOS.jl also supports the [JuliaOpt] **[MathProgBase]** standard solver interface.
 This interface can be used to solve LPs using `loadproblem!` and SOCPs through `loadconicproblem!` 
@@ -60,13 +60,13 @@ This example shows how we can model a simple knapsack problem with JuMP and use 
 
 ```julia
 using JuMP
-import ECOS
+using ECOS
 
 items  = [:Gold, :Silver, :Bronze]
-values = [:Gold => 5.0,  :Silver => 3.0,  :Bronze => 1.0]
-weight = [:Gold => 2.0,  :Silver => 1.5,  :Bronze => 0.3]
+values = Dict(:Gold => 5.0,  :Silver => 3.0,  :Bronze => 1.0)
+weight = Dict(:Gold => 2.0,  :Silver => 1.5,  :Bronze => 0.3)
 
-m = Model(solver=ECOS.ECOSSolver())
+m = Model(solver=ECOSSolver())
 @defVar(m, 0 <= take[items] <= 1)  # Define a variable for each item
 @setObjective(m, Max, sum{ values[item] * take[item], item in items})
 @addConstraint(m, sum{ weight[item] * take[item], item in items} <= 3)

@@ -44,8 +44,6 @@ end
 include("ECOSSolverInterface.jl")  # MathProgBase interface
 include("types.jl")  # All the types and constants defined in ecos.h
 
-export setup, solve, cleanup
-
 # setup  (direct interface)
 # Provide ECOS with a problem in the form
 # min c'x

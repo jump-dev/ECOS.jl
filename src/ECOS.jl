@@ -7,11 +7,9 @@
 # Contains the wrapper itself
 #############################################################################
 
-isdefined(Base, :__precompile__) && __precompile__()
+__precompile__()
 
 module ECOS
-
-using Compat
 
 # Try to load the binary dependency
 if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
@@ -38,13 +36,8 @@ function __init__()
 end
 
 # @fieldtype
-# for 0.3 compatibility
 macro fieldtype(instance, field)
-    if VERSION < v"0.4-"
-        return :(fieldtype($instance, $field))
-    else
-        return :(fieldtype(typeof($instance), $field))
-    end
+    return :(fieldtype(typeof($instance), $field))
 end
 
 
@@ -85,10 +78,10 @@ export setup, solve, cleanup
 #   b       RHS for equality constraints, length(b) == b (can be nothing)
 # Returns a pointer to the ECOS pwork structure (Cpwork in ECOS.jl). See
 # types.jl for more information.
-function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::@compat(Union{Vector{Int},Void}), e::Int,
+function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int},Void}, e::Int,
                 Gpr::Vector{Float64}, Gjc::Vector{Int}, Gir::Vector{Int},
-                Apr::@compat(Union{Vector{Float64},Void}), Ajc::@compat(Union{Vector{Int},Void}), Air::@compat(Union{Vector{Int},Void}),
-                c::Vector{Float64}, h::Vector{Float64}, b::@compat(Union{Vector{Float64},Void}); kwargs...)
+                Apr::Union{Vector{Float64},Void}, Ajc::Union{Vector{Int},Void}, Air::Union{Vector{Int},Void},
+                c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Void}; kwargs...)
     # Convert to canonical forms
     q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
     Apr = (Apr == nothing) ? convert(Ptr{Cdouble}, C_NULL) : Apr

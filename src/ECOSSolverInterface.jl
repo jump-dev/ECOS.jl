@@ -17,7 +17,7 @@ immutable ECOSSolver <: AbstractMathProgSolver
 end
 ECOSSolver(;kwargs...) = ECOSSolver(kwargs)
 
-type ECOSMathProgModel <: AbstractMathProgModel
+type ECOSMathProgModel <: AbstractConicModel
     nvar::Int                           # Number of variables
     nineq::Int                          # Number of inequalities Gx <=_K h
     neq::Int                            # Number of equalities Ax = b
@@ -62,85 +62,13 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
 # Begin implementation of the MPB low-level interface
 # Implements
 # - model
-# - loadproblem!
 # - optimize!
 # - status
 # http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
 
-model(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
+ConicModel(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
+LinearQuadraticModel(s::ECOSSolver) = ConicToLPQPBridge(ConicModel(s))
 
-# Loads the provided problem data to set up the linear programming problem:
-# min c'x
-# st  lb <= Ax <= ub
-#      l <=  x <= u
-# where sense = :Min or :Max
-function loadproblem!(m::ECOSMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
-    (nvar = length(collb)) == length(colub) || error("Unequal lengths for column bounds")
-    (nrow = length(rowlb)) == length(rowub) || error("Unequal lengths for row bounds")
-
-    # Turn variable bounds into constraints
-    # Inefficient, because keeps allocating memory!
-    # Would need to batch, get tricky...
-    for j = 1:nvar
-        if collb[j] != -Inf
-            # Variable has lower bound
-            newrow = zeros(1, nvar)
-            newrow[j] = -1.0
-            A = vcat(A, newrow)
-            rowlb = vcat(rowlb, -Inf)
-            rowub = vcat(rowub, -collb[j])
-            nrow += 1
-        end
-        if colub[j] != +Inf
-            # Variable has upper bound
-            newrow = zeros(1, nvar)
-            newrow[j] = 1.0
-            A = vcat(A, newrow)
-            rowlb = vcat(rowlb, -Inf)
-            rowub = vcat(rowub, colub[j])
-            nrow += 1
-        end
-    end
-
-    eqidx   = Int[]      # Equality row indicies
-    ineqidx = Int[]      # Inequality row indicies
-    eqbnd   = Float64[]  # Bounds for equality rows
-    ineqbnd = Float64[]  # Bounds for inequality row
-    for it in 1:nrow
-        # Equality constraint
-        if rowlb[it] == rowub[it]
-            push!(eqidx, it)
-            push!(eqbnd, rowlb[it])
-        # Range constraint - not supported
-        elseif rowlb[it] != -Inf && rowub[it] != Inf
-            error("Ranged constraints unsupported!")
-        # Less-than constraint
-        elseif rowlb[it] == -Inf
-            push!(ineqidx, it)
-            push!(ineqbnd, rowub[it])
-        # Greater-than constraint - flip sign so only have <= constraints
-        else
-            push!(ineqidx, it)
-            push!(ineqbnd, -rowlb[it])
-            A[it,:] *= -1 # flip signs so we have Ax<=b
-        end
-    end
-
-    m.nvar      = nvar                  # Number of variables
-    m.nineq     = length(ineqidx)       # Number of inequalities Gx <=_K h
-    m.neq       = length(eqidx)         # Number of equalities Ax = b
-    m.npos      = length(ineqidx)       # Number of positive orthant cone
-    m.ncones    = 0                     # Number of SO cones
-    m.conedims  = Int[]                 # Dimenions of SO cones
-    m.G         = sparse(A[ineqidx,:])  # The G matrix (inequalties)
-    m.A         = sparse(A[eqidx,:])    # The A matrix (equalities)
-    m.c         = (sense == :Max) ? obj * -1 : copy(obj)
-                                        # The objective coeffs (always min)
-    m.orig_sense = sense                # Original objective sense
-    m.h         = ineqbnd               # RHS for inequality
-    m.b         = eqbnd                 # RHS for equality
-    m.fwd_map   = collect(1:nvar)       # Identity mapping
-end
 
 function optimize!(m::ECOSMathProgModel)
     ecos_prob_ptr = setup(
@@ -187,7 +115,7 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 
 supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:ExpPrimal]
 
-function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
+function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     # If A is sparse, we should use an appropriate "zeros"
     const zeromat = isa(A,SparseMatrixCSC) ? spzeros : zeros
 
@@ -445,7 +373,7 @@ function loadconicproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cone
 end
 
 
-function getconicdual(m::ECOSMathProgModel)
+function getdual(m::ECOSMathProgModel)
     duals = zeros(length(m.row_map_ind))
     for (mpb_row,ecos_row) in enumerate(m.row_map_ind)
         cone = m.row_map_type[mpb_row]

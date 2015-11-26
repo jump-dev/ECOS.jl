@@ -1,7 +1,5 @@
 using BinDeps
 
-using Compat
-
 @BinDeps.setup
 
 ecos = library_dependency("ecos", aliases=["libecos"])
@@ -46,4 +44,4 @@ provides(SimpleBuild,
         end)
     end),[ecos], os = :Unix)
 
-@BinDeps.install @compat Dict(:ecos => :ecos)
+@BinDeps.install Dict(:ecos => :ecos)

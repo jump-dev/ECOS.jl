@@ -224,3 +224,30 @@ immutable Cpwork
     # settings struct
     stgs::Ptr{Csettings}
 end
+
+immutable Cbb_pwork
+    # mixed integer data
+    num_bool_vars::Clong
+    num_int_vars::Clong
+
+    nodes::Ptr{Void}
+    bool_node_ids::Ptr{Void}
+    int_node_ids::Ptr{Cdouble}
+
+    bool_vars_idx::Ptr{Clong}
+    int_vars_idx::Ptr{Clong}
+
+    # ECOS data
+    pwork::Ptr{Cpwork}
+
+    # modified pointers to ecos internals
+
+    A::Ptr{Void}
+    G::Ptr{Void}
+    c::Ptr{Cdouble}
+    b::Ptr{Cdouble}
+    h::Ptr{Cdouble}
+
+    x::Ptr{Cdouble} # primal variables
+    # don't need any of the rest
+end

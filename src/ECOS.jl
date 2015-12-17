@@ -170,6 +170,90 @@ function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
     ccall((:ECOS_cleanup, ECOS.ecos), Void, (Ptr{Cpwork}, Clong), problem, keepvars)
 end
 
+# wrapper for branch & bound functionality
+# same input as setup() plus last 4 argumnets
+function setup_bb(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int},Void}, e::Int,
+                Gpr::Vector{Float64}, Gjc::Vector{Int}, Gir::Vector{Int},
+                Apr::Union{Vector{Float64},Void}, Ajc::Union{Vector{Int},Void}, Air::Union{Vector{Int},Void},
+                c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Void},
+                num_bool_vars::Int, bool_vars_idx::Vector{Int},
+                num_int_vars::Int, int_vars_idx::Vector{Int}; kwargs...)
+    # Convert to canonical forms
+    q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
+    Apr = (Apr == nothing) ? convert(Ptr{Cdouble}, C_NULL) : Apr
+    Ajc = (Ajc == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Ajc)
+    Air = (Air == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Air)
+    b = (b == nothing) ? convert(Ptr{Cdouble}, C_NULL) : b
+    problem_ptr = ccall((:ECOS_BB_setup, ECOS.ecos), Ptr{Cbb_pwork},
+        (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Clong,
+         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
+         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
+         Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble},
+         Clong, Ptr{Clong}, Clong, Ptr{Clong}, Ptr{Void}),
+        n, m, p, l, ncones, q, e,
+        Gpr, convert(Vector{Clong},Gjc), convert(Vector{Clong},Gir),
+        Apr, Ajc, Air,
+        c, h, b,
+        num_bool_vars, convert(Vector{Clong},bool_vars_idx),
+        num_int_vars, convert(Vector{Clong},int_vars_idx), C_NULL)
+
+    problem_ptr != C_NULL || error("ECOS failed to construct problem.")
+
+    @assert isempty(kwargs)
+    # settings not yet supported
+
+    problem_ptr
+end
+
+# setup  (more general interface)
+# A more tolerant version of the above method that doesn't require
+# user to fiddle with internals of the sparse matrix format
+# User can pass nothing as argument for A, b, and q
+function setup_bb(n, m, p, l, ncones, q, e, G, A, c, h, b,
+                  bool_vars_idx, int_vars_idx; options...)
+    if A == nothing
+        if b != nothing
+            @assert length(b) == 0
+            b = nothing
+        end
+        @assert p == 0
+        Apr = nothing
+        Ajc = nothing
+        Air = nothing
+    else
+        numrow, numcol = size(A)
+        @assert numcol == n
+        @assert numrow == length(b)
+        sparseA = sparse(A)
+        Apr = convert(Vector{Float64}, sparseA.nzval)
+        Ajc = sparseA.colptr - 1  # C is 0-based
+        Air = sparseA.rowval - 1
+    end
+
+    sparseG = sparse(G)
+    Gpr = convert(Vector{Float64}, sparseG.nzval)
+    Gjc = sparseG.colptr - 1  # C is 0-based
+    Gir = sparseG.rowval - 1
+
+    setup_bb(  n, m, p, l, ncones, q, e,
+            Gpr, Gjc, Gir,
+            Apr, Ajc, Air,
+            c, h, b, length(bool_vars_idx), bool_vars_idx,
+            length(int_vars_idx), int_vars_idx; options...)
+end
+
+
+
+function solve(problem::Ptr{Cbb_pwork})
+    exitflag = ccall((:ECOS_BB_solve, ECOS.ecos), Clong, (Ptr{Cbb_pwork},), problem)
+end
+
+function cleanup(problem::Ptr{Cbb_pwork}, keepvars::Int = 0)
+    ccall((:ECOS_BB_cleanup, ECOS.ecos), Void, (Ptr{Cbb_pwork}, Clong), problem, keepvars)
+end
+
+
+
 # ver  [not exported]
 # Returns the version of ECOS in use
 function ver()

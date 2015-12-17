@@ -28,7 +28,6 @@ type ECOSMathProgModel <: AbstractConicModel
     G::SparseMatrixCSC{Float64,Int}     # The G matrix (inequalties)
     A::SparseMatrixCSC{Float64,Int}     # The A matrix (equalities)
     c::Vector{Float64}                  # The objective coeffs (always min)
-    orig_sense::Symbol                  # Original objective sense
     h::Vector{Float64}                  # RHS for inequality
     b::Vector{Float64}                  # RHS for equality
     # Post-solve
@@ -44,18 +43,19 @@ type ECOSMathProgModel <: AbstractConicModel
     row_map_type::Vector{Symbol}
     # To reorder solution if we solved using the conic interface
     fwd_map::Vector{Int}
+    vartypes::Vector{Symbol}
     options
 end
 ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
                                         Int[],0,
                                         spzeros(0,0),
                                         spzeros(0,0),
-                                        Float64[], :Min,
+                                        Float64[],
                                         Float64[], Float64[],
                                         :NotSolved, 0.0,
                                         Float64[],
                                         Float64[], Float64[],
-                                        Int[], Symbol[], Int[],
+                                        Int[], Symbol[], Int[], Symbol[],
                                         kwargs)
 
 #############################################################################
@@ -64,19 +64,35 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
 # - model
 # - optimize!
 # - status
-# http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
+# - setvartype!
+# http://mathprogbasejl.readthedocs.org/en/latest/solverinterface.html
 
 ConicModel(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
 LinearQuadraticModel(s::ECOSSolver) = ConicToLPQPBridge(ConicModel(s))
 
 
 function optimize!(m::ECOSMathProgModel)
-    ecos_prob_ptr = setup(
-        m.nvar, m.nineq, m.neq,
-        m.npos, m.ncones, m.conedims, m.nexp_cones,
-        m.G, m.A,
-        m.c[:],  # Seems to modify this
-        m.h, m.b; m.options...)
+    discrete = any(s -> s!=:Cont, m.vartypes)
+    if discrete
+        bin_idx = find(s-> s==:Bin, m.vartypes)
+        int_idx = find(s-> s==:Int, m.vartypes)
+        # TODO: error on other variable types
+        ecos_prob_ptr = setup_bb(
+                m.nvar, m.nineq, m.neq,
+                m.npos, m.ncones, m.conedims, m.nexp_cones,
+                m.G, m.A,
+                m.c[:],  # Seems to modify this
+                m.h, m.b,
+                bin_idx, int_idx,
+                ; m.options...)
+    else
+        ecos_prob_ptr = setup(
+            m.nvar, m.nineq, m.neq,
+            m.npos, m.ncones, m.conedims, m.nexp_cones,
+            m.G, m.A,
+            m.c[:],  # Seems to modify this
+            m.h, m.b; m.options...)
+    end
 
     flag = solve(ecos_prob_ptr)
     if flag == ECOS_OPTIMAL
@@ -95,9 +111,11 @@ function optimize!(m::ECOSMathProgModel)
     # Extract solution
     ecos_prob = pointer_to_array(ecos_prob_ptr, 1)[1]
     m.primal_sol = pointer_to_array(ecos_prob.x, m.nvar)[:]
-    m.dual_sol_eq   = pointer_to_array(ecos_prob.y, m.neq)[:]
-    m.dual_sol_ineq = pointer_to_array(ecos_prob.z, m.nineq)[:]
-    m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
+    if !discrete
+        m.dual_sol_eq   = pointer_to_array(ecos_prob.y, m.neq)[:]
+        m.dual_sol_ineq = pointer_to_array(ecos_prob.z, m.nineq)[:]
+    end
+    m.obj_val = dot(m.c, m.primal_sol)
     cleanup(ecos_prob_ptr, 0)
 end
 
@@ -105,11 +123,17 @@ status(m::ECOSMathProgModel) = m.solve_stat
 getobjval(m::ECOSMathProgModel) = m.obj_val
 getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 
+function setvartype!(m::ECOSMathProgModel,v::Vector{Symbol})
+    @assert length(v) <= m.nvar
+    m.vartypes[1:length(v)] = v
+    return m.vartypes
+end
+
 #############################################################################
 # Begin implementation of the MPB conic interface
 # Implements
 # - supportedcones
-# - loadconicproblem!
+# - loadproblem!
 # - getconicdual
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
@@ -366,10 +390,10 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     m.G             = ecos_G
     m.A             = ecos_A
     m.c             = ecos_c
-    m.orig_sense    = :Min
     m.h             = ecos_h
     m.b             = ecos_b
     m.fwd_map       = fwd_map           # Used to return solution
+    m.vartypes      = fill(:Cont,num_vars)
 end
 
 

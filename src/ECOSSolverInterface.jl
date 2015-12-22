@@ -19,6 +19,7 @@ ECOSSolver(;kwargs...) = ECOSSolver(kwargs)
 
 type ECOSMathProgModel <: AbstractConicModel
     nvar::Int                           # Number of variables
+    nconstr::Int                        # Number of rows in the MPB-form A matrix
     nineq::Int                          # Number of inequalities Gx <=_K h
     neq::Int                            # Number of equalities Ax = b
     npos::Int                           # Number of positive orthant cones
@@ -46,7 +47,7 @@ type ECOSMathProgModel <: AbstractConicModel
     fwd_map::Vector{Int}
     options
 end
-ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
+ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,0,
                                         Int[],0,
                                         spzeros(0,0),
                                         spzeros(0,0),
@@ -64,6 +65,8 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,
 # - model
 # - optimize!
 # - status
+# - numvar
+# - numconstr
 # http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
 
 ConicModel(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
@@ -105,6 +108,9 @@ status(m::ECOSMathProgModel) = m.solve_stat
 getobjval(m::ECOSMathProgModel) = m.obj_val
 getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 
+numvar(m::ECOSMathProgModel) = m.nvar
+numconstr(m::ECOSMathProgModel) = m.nineq + m.neq
+
 #############################################################################
 # Begin implementation of the MPB conic interface
 # Implements
@@ -116,6 +122,7 @@ getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:ExpPrimal]
 
 function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
+    m.nconstr = size(A,1)
     # If A is sparse, we should use an appropriate "zeros"
     const zeromat = isa(A,SparseMatrixCSC) ? spzeros : zeros
 

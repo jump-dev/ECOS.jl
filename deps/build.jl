@@ -17,7 +17,7 @@ provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/v$version.tar.gz
 prefix = joinpath(BinDeps.depsdir(ecos),"usr")
 srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-$version")
 
-provides(Binaries, URI("https://cache.e.ip.saba.us/https://bintray.com/artifact/download/tkelman/generic/ecos-$win_version.7z"),
+provides(Binaries, URI("https://cache.julialang.org/https://bintray.com/artifact/download/tkelman/generic/ecos-$win_version.7z"),
     [ecos], unpacked_dir="usr/bin$WORD_SIZE", os = :Windows,
     SHA="b90254220a9a63cba08700f3664519d360f45d363454e5c107e6f30e144a60a1")
 

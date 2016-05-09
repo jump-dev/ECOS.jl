@@ -355,7 +355,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
             m.row_map_ind[idxs[1]] = neq_cur_ind
             m.row_map_ind[idxs[3]] = neq_cur_ind+1
             m.row_map_ind[idxs[2]] = neq_cur_ind+2
-            neq_cur_ind += 1
+            neq_cur_ind += 3
         end
     end
     ecos_G = vcat(ecos_G, A[exp_rows,rev_map])

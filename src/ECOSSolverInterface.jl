@@ -38,12 +38,17 @@ type ECOSMathProgModel <: AbstractConicModel
     primal_sol::Vector{Float64}
     dual_sol_eq::Vector{Float64}
     dual_sol_ineq::Vector{Float64}
+    # Maps x∈K to ECOS duals
+    # .._ind maps a column to a row index
+    # .._type  is the original cone type of each column
+    col_map_ind::Vector{Int}
+    col_map_type::Vector{Symbol}
     # Maps b-Ax∈K to ECOS duals
     # .._ind maps a row to an index
     # .._type  is the original cone type of each row
     row_map_ind::Vector{Int}
     row_map_type::Vector{Symbol}
-    # To reorder solution if we solved using the conic interface
+    # To reorder solution to MPB form
     fwd_map::Vector{Int}
     options
 end
@@ -56,6 +61,7 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,0,
                                         :NotSolved, 0.0,
                                         Float64[],
                                         Float64[], Float64[],
+                                        Int[], Symbol[],
                                         Int[], Symbol[], Int[],
                                         kwargs)
 
@@ -179,9 +185,10 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     ecos_b = Float64[]
 
     # Mapping for duals
+    m.col_map_ind = zeros(Int,num_vars)
     m.row_map_ind = zeros(Int, length(b))
     m.row_map_type  = Array(Symbol, length(b))
-    function update_map(cone_type, cur_ind)
+    function update_row_map(cone_type, cur_ind)
         for (cone,idxs) in constr_cones
             if cone == cone_type
                 for idx in idxs
@@ -205,6 +212,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
         new_row[j] = 1.0
         ecos_A     = vcat(ecos_A, new_row)
         ecos_b     = vcat(ecos_b, 0.0)
+        m.col_map_ind[j] = length(ecos_b)
     end
 
     # G matrix:
@@ -215,6 +223,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     for j = 1:num_vars
         !(idxcone[j] == :NonNeg || idxcone[j] == :NonPos) && continue
         num_G_row_negpos += 1
+        m.col_map_ind[j] = num_G_row_negpos
     end
     ecos_G = zeromat(num_G_row_negpos,num_vars)
     ecos_h =   zeros(num_G_row_negpos)
@@ -255,10 +264,10 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     end
     # Update mappings - eq, nonneg, nonpos
      eq_cur_ind = length(ecos_b) + 1
-     eq_cur_ind = update_map(:Zero, eq_cur_ind)
+     eq_cur_ind = update_row_map(:Zero, eq_cur_ind)
     neq_cur_ind = length(ecos_h) + 1
-    neq_cur_ind = update_map(:NonNeg, neq_cur_ind)
-    neq_cur_ind = update_map(:NonPos, neq_cur_ind)
+    neq_cur_ind = update_row_map(:NonNeg, neq_cur_ind)
+    neq_cur_ind = update_row_map(:NonPos, neq_cur_ind)
     # Equality constraints / Zero cones
     ecos_A = vcat(ecos_A,  A[eq_rows,rev_map])
     ecos_b = vcat(ecos_b,  b[eq_rows])
@@ -297,6 +306,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
         # Add the entries (carrying on from pos. orthant)
         for j in idxs
             ecos_G[G_row,fwd_map[j]] = -1.0
+            m.col_map_ind[j] = G_row
             G_row += 1
         end
     end
@@ -314,7 +324,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
             all_rows   = vcat(all_rows,   idx_list)
         end
     end
-    neq_cur_ind = update_map(:SOC, neq_cur_ind)
+    neq_cur_ind = update_row_map(:SOC, neq_cur_ind)
     ecos_G = vcat(ecos_G, A[all_rows,rev_map])
     ecos_h = vcat(ecos_h, b[all_rows])
 
@@ -339,6 +349,9 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
         ecos_G[G_row,fwd_map[idxs[1]]] = -1.0
         ecos_G[G_row+2,fwd_map[idxs[2]]] = -1.0
         ecos_G[G_row+1,fwd_map[idxs[3]]] = -1.0
+        m.col_map_ind[idxs[1]] = G_row
+        m.col_map_ind[idxs[2]] = G_row+2
+        m.col_map_ind[idxs[3]] = G_row+1
         G_row += 3
     end
     @assert G_row == num_pos_orth + num_G_row_soc + sum(all_rows) + num_G_row_exp + 1
@@ -350,7 +363,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
             @assert length(idxs) == 3
             append!(exp_rows, [idxs[1],idxs[3],idxs[2]])
 
-            # override update_map to handle the permutation
+            # override update_row_map to handle the permutation
             m.row_map_type[idxs] = :ExpPrimal
             m.row_map_ind[idxs[1]] = neq_cur_ind
             m.row_map_ind[idxs[3]] = neq_cur_ind+1
@@ -377,6 +390,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     m.h             = ecos_h
     m.b             = ecos_b
     m.fwd_map       = fwd_map           # Used to return solution
+    m.col_map_type  = idxcone
 end
 
 
@@ -393,6 +407,27 @@ function getdual(m::ECOSMathProgModel)
                 duals[mpb_row] = -m.dual_sol_ineq[ecos_row]
             else
                 duals[mpb_row] = m.dual_sol_ineq[ecos_row]
+            end
+        end
+    end
+    return duals
+end
+
+
+function getvardual(m::ECOSMathProgModel)
+    duals = zeros(length(m.col_map_ind))
+    for (mpb_col,ecos_row) in enumerate(m.col_map_ind)
+        cone = m.col_map_type[mpb_col]
+        cone == :Free && continue # dual is zero
+        if cone == :Zero
+            # This MPB zero var ended up in ECOS equality block
+            duals[mpb_col] = m.dual_sol_eq[ecos_row]
+        else
+            # Ended up in ECOS inequality block
+            if cone == :NonPos
+                duals[mpb_col] = -m.dual_sol_ineq[ecos_row]
+            else
+                duals[mpb_col] = m.dual_sol_ineq[ecos_row]
             end
         end
     end

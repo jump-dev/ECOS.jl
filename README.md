@@ -26,8 +26,6 @@ ECOS.jl will automatically setup the ECOS solver itself:
 The ECOS interface is completely wrapped. ECOS functions corresponding to the C API are available as `ECOS.setup`, `ECOS.solve`, `ECOS.cleanup`, and `ECOS.ver` (these are not exported from the module). Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.
 
 ECOS.jl also supports the [JuliaOpt] **[MathProgBase]** standard solver interface.
-This interface can be used to solve LPs using `loadproblem!` and SOCPs through `loadconicproblem!` 
-([documentation](http://mathprogbasejl.readthedocs.org/en/latest/conic.html)).
 Thanks to this support ECOS can be used as a solver with both the **[JuMP]** and **[Convex.jl]** modeling languages.
 
 All ECOS solver options can be set through the direct interface and through MathProgBase.

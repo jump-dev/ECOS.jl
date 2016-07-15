@@ -254,7 +254,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
         (cone == :SOC || cone == :ExpPrimal) && continue  # Handle later
-        idxset = collect(idxs)::Vector{Int}
+        idxset = vec(collect(idxs))::Vector{Int}
         if cone == :Zero
             append!(eq_rows, idxset)
             continue

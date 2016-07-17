@@ -4,10 +4,10 @@
 [![Coverage Status](https://img.shields.io/coveralls/JuliaOpt/ECOS.jl.svg)](https://coveralls.io/r/JuliaOpt/ECOS.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/bnvddmeevtrmjyc2/branch/master)](https://ci.appveyor.com/project/mlubin/ecos-jl/branch/master)
 
-[![ECOS](http://pkg.julialang.org/badges/ECOS_0.3.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.3)
 [![ECOS](http://pkg.julialang.org/badges/ECOS_0.4.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.4)
+[![ECOS](http://pkg.julialang.org/badges/ECOS_0.5.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.5)
 
-Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable second-order cone problem (SOCP) interior point solver.
+Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable conic optimization interior point solver.
 
 ## Installation
 
@@ -65,12 +65,12 @@ values = Dict(:Gold => 5.0,  :Silver => 3.0,  :Bronze => 1.0)
 weight = Dict(:Gold => 2.0,  :Silver => 1.5,  :Bronze => 0.3)
 
 m = Model(solver=ECOSSolver())
-@defVar(m, 0 <= take[items] <= 1)  # Define a variable for each item
-@setObjective(m, Max, sum{ values[item] * take[item], item in items})
-@addConstraint(m, sum{ weight[item] * take[item], item in items} <= 3)
+@variable(m, 0 <= take[items] <= 1)  # Define a variable for each item
+@objective(m, Max, sum{ values[item] * take[item], item in items})
+@constraint(m, sum{ weight[item] * take[item], item in items} <= 3)
 solve(m)
 
-println(getValue(take))
+println(getvalue(take))
 # take
 # [  Gold] = 0.9999999680446406
 # [Silver] = 0.46666670881026834

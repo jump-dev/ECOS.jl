@@ -11,6 +11,8 @@ __precompile__()
 
 module ECOS
 
+import Compat: unsafe_string, unsafe_wrap
+
 # Try to load the binary dependency
 if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
     include("../deps/deps.jl")
@@ -174,7 +176,7 @@ end
 # Returns the version of ECOS in use
 function ver()
     ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{UInt8}, ())
-    return bytestring(ver_ptr)
+    return unsafe_string(ver_ptr)
 end
 
 end # module

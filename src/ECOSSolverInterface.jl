@@ -102,10 +102,10 @@ function optimize!(m::ECOSMathProgModel)
         m.solve_stat = :Error
     end
     # Extract solution
-    ecos_prob = pointer_to_array(ecos_prob_ptr, 1)[1]
-    m.primal_sol = pointer_to_array(ecos_prob.x, m.nvar)[:]
-    m.dual_sol_eq   = pointer_to_array(ecos_prob.y, m.neq)[:]
-    m.dual_sol_ineq = pointer_to_array(ecos_prob.z, m.nineq)[:]
+    ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
+    m.primal_sol = unsafe_wrap(Array,ecos_prob.x, m.nvar)[:]
+    m.dual_sol_eq   = unsafe_wrap(Array,ecos_prob.y, m.neq)[:]
+    m.dual_sol_ineq = unsafe_wrap(Array,ecos_prob.z, m.nineq)[:]
     m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
     cleanup(ecos_prob_ptr, 0)
 end

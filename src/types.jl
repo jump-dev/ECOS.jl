@@ -140,87 +140,178 @@ immutable Csettings
     centrality::Cdouble
 end
 
-immutable Cpwork
-    # Dimensions
-    n::Clong
-    m::Clong
-    p::Clong
-    D::Clong
+if VersionNumber(ver()) >= v"2.0.5"
+    @eval immutable Cpwork
+        # Dimensions
+        n::Clong
+        m::Clong
+        p::Clong
+        D::Clong
 
-    # Variables
-    x::Ptr{Cdouble}
-    y::Ptr{Cdouble}
-    z::Ptr{Cdouble}
-    s::Ptr{Cdouble}
-    lambda::Ptr{Cdouble}
-    kap::Cdouble
-    tau::Cdouble
+        # Variables
+        x::Ptr{Cdouble}
+        y::Ptr{Cdouble}
+        z::Ptr{Cdouble}
+        s::Ptr{Cdouble}
+        lambda::Ptr{Cdouble}
+        kap::Cdouble
+        tau::Cdouble
 
-    # Best iterates seen so far
-    best_x::Ptr{Cdouble}
-    best_y::Ptr{Cdouble}
-    best_z::Ptr{Cdouble}
-    best_s::Ptr{Cdouble}
-    best_kap::Cdouble
-    best_tau::Cdouble
-    best_cx::Cdouble
-    best_by::Cdouble
-    best_hz::Cdouble
-    best_info::Ptr{Cstats}
+        # Best iterates seen so far
+        best_x::Ptr{Cdouble}
+        best_y::Ptr{Cdouble}
+        best_z::Ptr{Cdouble}
+        best_s::Ptr{Cdouble}
+        best_kap::Cdouble
+        best_tau::Cdouble
+        best_cx::Cdouble
+        best_by::Cdouble
+        best_hz::Cdouble
+        best_info::Ptr{Cstats}
 
-    # Temporary variables
-    dsaff::Ptr{Cdouble}
-    dzaff::Ptr{Cdouble}
-    W_times_dzaff::Ptr{Cdouble}
-    dsaff_by_W::Ptr{Cdouble}
-    saff::Ptr{Cdouble}
-    zaff::Ptr{Cdouble}
+        # Temporary variables
+        dsaff::Ptr{Cdouble}
+        dzaff::Ptr{Cdouble}
+        W_times_dzaff::Ptr{Cdouble}
+        dsaff_by_W::Ptr{Cdouble}
+        saff::Ptr{Cdouble}
+        zaff::Ptr{Cdouble}
 
-    # Cone
-    C::Ptr{Ccone}
-    A::Ptr{Cspmat}
-    G::Ptr{Cspmat}
-    c::Ptr{Cdouble}
-    b::Ptr{Cdouble}
-    h::Ptr{Cdouble}
+        # Cone
+        C::Ptr{Ccone}
+        A::Ptr{Cspmat}
+        G::Ptr{Cspmat}
+        c::Ptr{Cdouble}
+        b::Ptr{Cdouble}
+        h::Ptr{Cdouble}
 
-    # equilibration vector
-    xequil::Ptr{Cdouble}
-    Aequil::Ptr{Cdouble}
-    Gequil::Ptr{Cdouble}
+        # indices that map entries of A and G to the KKT matrix
+        AtoK::Ptr{Clong}
+        GtoK::Ptr{Clong}
 
-    # scalings of problem data
-    resx0::Cdouble
-    resy0::Cdouble
-    resz0::Cdouble
+        # equilibration vector
+        xequil::Ptr{Cdouble}
+        Aequil::Ptr{Cdouble}
+        Gequil::Ptr{Cdouble}
 
-    # residuals
-    rx::Ptr{Cdouble}
-    ry::Ptr{Cdouble}
-    rz::Ptr{Cdouble}
-    rt::Cdouble
-    hresx::Cdouble
-    hresy::Cdouble
-    hresz::Cdouble
+        # scalings of problem data
+        resx0::Cdouble
+        resy0::Cdouble
+        resz0::Cdouble
 
-    # norm iterates
-    nx::Cdouble
-    ny::Cdouble
-    nz::Cdouble
-    ns::Cdouble
+        # residuals
+        rx::Ptr{Cdouble}
+        ry::Ptr{Cdouble}
+        rz::Ptr{Cdouble}
+        rt::Cdouble
+        hresx::Cdouble
+        hresy::Cdouble
+        hresz::Cdouble
 
-    # temporary storage
-    cx::Cdouble
-    by::Cdouble
-    hz::Cdouble
-    sz::Cdouble
+        # norm iterates
+        nx::Cdouble
+        ny::Cdouble
+        nz::Cdouble
+        ns::Cdouble
 
-    # KKT System
-    KKT::Ptr{Ckkt}
+        # temporary storage
+        cx::Cdouble
+        by::Cdouble
+        hz::Cdouble
+        sz::Cdouble
 
-    # info struct
-    info::Ptr{Cstats}
+        # KKT System
+        KKT::Ptr{Ckkt}
 
-    # settings struct
-    stgs::Ptr{Csettings}
+        # info struct
+        info::Ptr{Cstats}
+
+        # settings struct
+        stgs::Ptr{Csettings}
+    end
+else
+    @eval immutable Cpwork
+        # Dimensions
+        n::Clong
+        m::Clong
+        p::Clong
+        D::Clong
+
+        # Variables
+        x::Ptr{Cdouble}
+        y::Ptr{Cdouble}
+        z::Ptr{Cdouble}
+        s::Ptr{Cdouble}
+        lambda::Ptr{Cdouble}
+        kap::Cdouble
+        tau::Cdouble
+
+        # Best iterates seen so far
+        best_x::Ptr{Cdouble}
+        best_y::Ptr{Cdouble}
+        best_z::Ptr{Cdouble}
+        best_s::Ptr{Cdouble}
+        best_kap::Cdouble
+        best_tau::Cdouble
+        best_cx::Cdouble
+        best_by::Cdouble
+        best_hz::Cdouble
+        best_info::Ptr{Cstats}
+
+        # Temporary variables
+        dsaff::Ptr{Cdouble}
+        dzaff::Ptr{Cdouble}
+        W_times_dzaff::Ptr{Cdouble}
+        dsaff_by_W::Ptr{Cdouble}
+        saff::Ptr{Cdouble}
+        zaff::Ptr{Cdouble}
+
+        # Cone
+        C::Ptr{Ccone}
+        A::Ptr{Cspmat}
+        G::Ptr{Cspmat}
+        c::Ptr{Cdouble}
+        b::Ptr{Cdouble}
+        h::Ptr{Cdouble}
+
+        # equilibration vector
+        xequil::Ptr{Cdouble}
+        Aequil::Ptr{Cdouble}
+        Gequil::Ptr{Cdouble}
+
+        # scalings of problem data
+        resx0::Cdouble
+        resy0::Cdouble
+        resz0::Cdouble
+
+        # residuals
+        rx::Ptr{Cdouble}
+        ry::Ptr{Cdouble}
+        rz::Ptr{Cdouble}
+        rt::Cdouble
+        hresx::Cdouble
+        hresy::Cdouble
+        hresz::Cdouble
+
+        # norm iterates
+        nx::Cdouble
+        ny::Cdouble
+        nz::Cdouble
+        ns::Cdouble
+
+        # temporary storage
+        cx::Cdouble
+        by::Cdouble
+        hz::Cdouble
+        sz::Cdouble
+
+        # KKT System
+        KKT::Ptr{Ckkt}
+
+        # info struct
+        info::Ptr{Cstats}
+
+        # settings struct
+        stgs::Ptr{Csettings}
+    end
 end

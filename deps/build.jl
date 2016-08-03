@@ -4,7 +4,7 @@ using BinDeps
 
 ecos = library_dependency("ecos", aliases=["libecos"])
 
-@osx_only begin
+if is_apple()
     using Homebrew
     provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
 end
@@ -18,7 +18,7 @@ prefix = joinpath(BinDeps.depsdir(ecos),"usr")
 srcdir = joinpath(BinDeps.depsdir(ecos),"src","ecos-$version")
 
 provides(Binaries, URI("https://cache.julialang.org/https://bintray.com/artifact/download/tkelman/generic/ecos-$win_version.7z"),
-    [ecos], unpacked_dir="usr/bin$WORD_SIZE", os = :Windows,
+    [ecos], unpacked_dir="usr/bin$(Sys.WORD_SIZE)", os = :Windows,
     SHA="b90254220a9a63cba08700f3664519d360f45d363454e5c107e6f30e144a60a1")
 
 # We'll keep this around for emergencies, but OSX users should be able to use Homebrew

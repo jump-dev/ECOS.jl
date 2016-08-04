@@ -20,6 +20,13 @@ else
     error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")
 end
 
+# ver  [not exported]
+# Returns the version of ECOS in use
+function ver()
+    ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{UInt8}, ())
+    return unsafe_string(ver_ptr)
+end
+
 macro ecos_ccall(func, args...)
     f = "ECOS_$(func)"
     quote
@@ -170,13 +177,6 @@ end
 # The optional keepvars argument is number of variables to NOT free.
 function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
     ccall((:ECOS_cleanup, ECOS.ecos), Void, (Ptr{Cpwork}, Clong), problem, keepvars)
-end
-
-# ver  [not exported]
-# Returns the version of ECOS in use
-function ver()
-    ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{UInt8}, ())
-    return unsafe_string(ver_ptr)
 end
 
 end # module

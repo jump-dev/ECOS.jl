@@ -10,7 +10,7 @@ if is_apple()
     provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
 end
 
-version = "2.0.4"
+version = "2.0.5"
 win_version = "2.0.2"
 provides(Sources, URI("https://github.com/ifa-ethz/ecos/archive/v$version.tar.gz"),
     [ecos], os = :Unix, unpacked_dir="ecos-$version")

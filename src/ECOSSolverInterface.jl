@@ -166,7 +166,8 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     num_vars = length(c)
     fwd_map = Array(Int,    num_vars)  # Will be used for SOCs
     rev_map = Array(Int,    num_vars)  # Need to restore sol. vec.
-    idxcone = Array(Symbol, num_vars)  # We'll uses this for non-SOC/Exp
+    idxcone = Array(Symbol, num_vars)  # We'll use this for non-SOC/Exp
+    m.col_map_type = Array(Symbol,num_vars)
 
     # Now build the mapping between MPB variables and ECOS variables
     pos = 1
@@ -175,6 +176,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
             fwd_map[i]   = pos   # fwd_map = MPB idx -> ECOS idx
             rev_map[pos] = i     # rev_map = ECOS idx -> MPB idx
             idxcone[pos] = cone
+            m.col_map_type[i] = cone
             pos += 1
         end
     end
@@ -390,7 +392,6 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     m.h             = ecos_h
     m.b             = ecos_b
     m.fwd_map       = fwd_map           # Used to return solution
-    m.col_map_type  = idxcone
 end
 
 

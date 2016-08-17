@@ -167,7 +167,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     fwd_map = Array(Int,    num_vars)  # Will be used for SOCs
     rev_map = Array(Int,    num_vars)  # Need to restore sol. vec.
     idxcone = Array(Symbol, num_vars)  # We'll use this for non-SOC/Exp
-    m.col_map_type = Array(Symbol,num_vars)
+    m.col_map_type = Array(Symbol,num_vars) # In MPB indices
 
     # Now build the mapping between MPB variables and ECOS variables
     pos = 1
@@ -214,7 +214,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
         new_row[j] = 1.0
         ecos_A     = vcat(ecos_A, new_row)
         ecos_b     = vcat(ecos_b, 0.0)
-        m.col_map_ind[j] = length(ecos_b)
+        m.col_map_ind[rev_map[j]] = length(ecos_b)
     end
 
     # G matrix:
@@ -225,7 +225,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     for j = 1:num_vars
         !(idxcone[j] == :NonNeg || idxcone[j] == :NonPos) && continue
         num_G_row_negpos += 1
-        m.col_map_ind[j] = num_G_row_negpos
+        m.col_map_ind[rev_map[j]] = num_G_row_negpos
     end
     ecos_G = zeromat(num_G_row_negpos,num_vars)
     ecos_h =   zeros(num_G_row_negpos)

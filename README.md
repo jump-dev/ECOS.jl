@@ -4,7 +4,6 @@
 [![Coverage Status](https://img.shields.io/coveralls/JuliaOpt/ECOS.jl.svg)](https://coveralls.io/r/JuliaOpt/ECOS.jl)
 [![Build status](https://ci.appveyor.com/api/projects/status/bnvddmeevtrmjyc2/branch/master)](https://ci.appveyor.com/project/mlubin/ecos-jl/branch/master)
 
-[![ECOS](http://pkg.julialang.org/badges/ECOS_0.4.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.4)
 [![ECOS](http://pkg.julialang.org/badges/ECOS_0.5.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.5)
 
 Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable conic optimization interior point solver.

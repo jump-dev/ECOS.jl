@@ -11,8 +11,6 @@ __precompile__()
 
 module ECOS
 
-import Compat: unsafe_string, unsafe_wrap
-
 # Try to load the binary dependency
 if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
     include("../deps/deps.jl")
@@ -28,6 +26,7 @@ function ver()
 end
 
 macro ecos_ccall(func, args...)
+    args = map(esc,args)
     f = "ECOS_$(func)"
     quote
         @unix_only ret = ccall(($f,ECOS.ecos), $(args...))
@@ -43,12 +42,6 @@ function __init__()
         error("Current ECOS version installed is $(ver()), but we require version 2.0.*. On Linux and Windows, delete the contents of the `$depsdir` directory except for the files `build.jl` and `.gitignore`, then rerun Pkg.build(\"ECOS\"). On OS X, run `using Homebrew; Homebrew.update()` in Julia.")
     end
 end
-
-# @fieldtype
-macro fieldtype(instance, field)
-    return :(fieldtype(typeof($instance), $field))
-end
-
 
 include("ECOSSolverInterface.jl")  # MathProgBase interface
 include("types.jl")  # All the types and constants defined in ecos.h
@@ -119,7 +112,7 @@ function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int}
 
         new_settings = Csettings([
             setting in keys(options) ?
-            convert(@fieldtype(settings, setting), options[setting]) :
+            convert(fieldtype(typeof(settings), setting), options[setting]) :
             getfield(settings, setting)
             for setting in fieldnames(settings)]...)
 

@@ -128,6 +128,9 @@ numconstr(m::ECOSMathProgModel) = m.nineq + m.neq
 supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:ExpPrimal]
 
 function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
+    if size(A,2) == 0
+        Base.warn("Input matrix has no columns. ECOS is known to crash in this corner case.")
+    end
     m.nconstr = size(A,1)
     # If A is sparse, we should use an appropriate "zeros"
     const zeromat = isa(A,SparseMatrixCSC) ? spzeros : zeros

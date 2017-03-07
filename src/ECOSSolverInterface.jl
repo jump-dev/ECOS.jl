@@ -167,10 +167,10 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
 
     # Allocate space for the ECOS variables
     num_vars = length(c)
-    fwd_map = Array(Int,    num_vars)  # Will be used for SOCs
-    rev_map = Array(Int,    num_vars)  # Need to restore sol. vec.
-    idxcone = Array(Symbol, num_vars)  # We'll use this for non-SOC/Exp
-    m.col_map_type = Array(Symbol,num_vars) # In MPB indices
+    fwd_map = Array{Int}(num_vars)  # Will be used for SOCs
+    rev_map = Array{Int}(num_vars)  # Need to restore sol. vec.
+    idxcone = Array{Symbol}(num_vars)  # We'll use this for non-SOC/Exp
+    m.col_map_type = Array{Symbol}(num_vars) # In MPB indices
 
     # Now build the mapping between MPB variables and ECOS variables
     pos = 1
@@ -192,7 +192,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     # Mapping for duals
     m.col_map_ind = zeros(Int,num_vars)
     m.row_map_ind = zeros(Int, length(b))
-    m.row_map_type  = Array(Symbol, length(b))
+    m.row_map_type  = Array{Symbol}(length(b))
     function update_row_map(cone_type, cur_ind)
         for (cone,idxs) in constr_cones
             if cone == cone_type

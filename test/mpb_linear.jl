@@ -21,13 +21,13 @@ primaltol = 1e-6
 # solution is (0.75,0) with objval -0.75
 sol = linprog([-1,0],[2 1],'<',1.5,solver)
 @test sol.status == :Optimal
-@test_approx_eq_eps sol.objval -0.75 objtol
-@test_approx_eq_eps norm(sol.sol - [0.75,0.0]) 0 primaltol
+@test isapprox(sol.objval, -0.75, atol=objtol)
+@test isapprox(norm(sol.sol - [0.75,0.0]), 0, atol=primaltol)
 
 sol = linprog([-1,0],sparse([2 1]),'<',1.5,solver)
 @test sol.status == :Optimal
-@test_approx_eq_eps sol.objval -0.75 objtol
-@test_approx_eq_eps norm(sol.sol - [0.75,0.0]) 0 primaltol
+@test isapprox(sol.objval, -0.75, atol=objtol)
+@test isapprox(norm(sol.sol - [0.75,0.0]), 0, atol=primaltol)
 
 # test infeasible problem:
 # min x
@@ -57,10 +57,10 @@ s = ECOSSolver()
 m = MathProgBase.LinearQuadraticModel(s)
 MathProgBase.loadproblem!(m, A, collb, colub, obj, rowlb, rowub, sense)
 MathProgBase.optimize!(m)
-@test_approx_eq_eps MathProgBase.getobjval(m) 99.0 1e-5
+@test isapprox(MathProgBase.getobjval(m), 99.0, atol=1e-5)
 x = MathProgBase.getsolution(m)
-@test_approx_eq_eps x[1] 2.0 1e-5
-@test_approx_eq_eps x[2] 3.0 1e-5
-@test_approx_eq_eps x[3] 0.0 1e-5
-@test_approx_eq_eps x[4] 9.0 1e-5
-@test_approx_eq_eps x[5] 0.0 1e-5
+@test isapprox(x[1], 2.0, atol=1e-5)
+@test isapprox(x[2], 3.0, atol=1e-5)
+@test isapprox(x[3], 0.0, atol=1e-5)
+@test isapprox(x[4], 9.0, atol=1e-5)
+@test isapprox(x[5], 0.0, atol=1e-5)

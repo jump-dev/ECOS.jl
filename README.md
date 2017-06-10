@@ -1,10 +1,9 @@
 # ECOS.jl
 
-[![Build Status](https://travis-ci.org/JuliaOpt/ECOS.jl.svg?branch=master)](https://travis-ci.org/JuliaOpt/ECOS.jl)
-[![Coverage Status](https://img.shields.io/coveralls/JuliaOpt/ECOS.jl.svg)](https://coveralls.io/r/JuliaOpt/ECOS.jl)
-[![Build status](https://ci.appveyor.com/api/projects/status/bnvddmeevtrmjyc2/branch/master)](https://ci.appveyor.com/project/mlubin/ecos-jl/branch/master)
-
-[![ECOS](http://pkg.julialang.org/badges/ECOS_0.5.svg)](http://pkg.julialang.org/?pkg=ECOS&ver=0.5)
+| **PackageEvaluator** | **Build Status** |
+|:--------------------:|:----------------:|
+| [![][pkg-0.5-img]][pkg-0.5-url] | [![Build Status][build-img]][build-url] [![Build Status][winbuild-img]][winbuild-url] |
+| [![][pkg-0.6-img]][pkg-0.6-url] | [![Coveralls branch][coveralls-img]][coveralls-url] [![Codecov branch][codecov-img]][codecov-url] |
 
 Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable conic optimization interior point solver.
 
@@ -85,3 +84,17 @@ println(getvalue(take))
 [Convex.jl]: https://github.com/JuliaOpt/Convex.jl
 [Homebrew.jl]: https://github.com/JuliaLang/Homebrew.jl
 [JuliaOpt]: http://juliaopt.org
+
+[pkg-0.5-img]: http://pkg.julialang.org/badges/ECOS_0.5.svg
+[pkg-0.5-url]: http://pkg.julialang.org/?pkg=ECOS
+[pkg-0.6-img]: http://pkg.julialang.org/badges/ECOS_0.6.svg
+[pkg-0.6-url]: http://pkg.julialang.org/?pkg=ECOS
+
+[build-img]: https://travis-ci.org/JuliaOpt/ECOS.jl.svg?branch=master
+[build-url]: https://travis-ci.org/JuliaOpt/ECOS.jl
+[winbuild-img]: https://ci.appveyor.com/api/projects/status/n0c8b6t1w39jho6d/branch/master?svg=true
+[winbuild-url]: https://ci.appveyor.com/api/projects/status/n0c8b6t1w39jho6d/branch/master
+[coveralls-img]: https://coveralls.io/repos/github/JuliaOpt/ECOS.jl/badge.svg?branch=master
+[coveralls-url]: https://coveralls.io/github/JuliaOpt/ECOS.jl?branch=master
+[codecov-img]: http://codecov.io/github/JuliaOpt/ECOS.jl/coverage.svg?branch=master
+[codecov-url]: http://codecov.io/github/JuliaOpt/ECOS.jl?branch=master

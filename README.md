@@ -93,7 +93,7 @@ println(getvalue(take))
 [build-img]: https://travis-ci.org/JuliaOpt/ECOS.jl.svg?branch=master
 [build-url]: https://travis-ci.org/JuliaOpt/ECOS.jl
 [winbuild-img]: https://ci.appveyor.com/api/projects/status/n0c8b6t1w39jho6d/branch/master?svg=true
-[winbuild-url]: https://ci.appveyor.com/api/projects/status/n0c8b6t1w39jho6d/branch/master
+[winbuild-url]: https://ci.appveyor.com/project/JuliaOpt/ecos-jl/branch/master
 [coveralls-img]: https://coveralls.io/repos/github/JuliaOpt/ECOS.jl/badge.svg?branch=master
 [coveralls-url]: https://coveralls.io/github/JuliaOpt/ECOS.jl?branch=master
 [codecov-img]: http://codecov.io/github/JuliaOpt/ECOS.jl/coverage.svg?branch=master

@@ -34,6 +34,7 @@ type ECOSMathProgModel <: AbstractConicModel
     b::Vector{Float64}                  # RHS for equality
     # Post-solve
     solve_stat::Symbol
+    solve_time::Float64
     obj_val::Float64
     primal_sol::Vector{Float64}
     dual_sol_eq::Vector{Float64}
@@ -58,7 +59,7 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,0,
                                         spzeros(0,0),
                                         Float64[], :Min,
                                         Float64[], Float64[],
-                                        :NotSolved, 0.0,
+                                        :NotSolved, 0.0, 0.0,
                                         Float64[],
                                         Float64[], Float64[],
                                         Int[], Symbol[],
@@ -87,7 +88,9 @@ function optimize!(m::ECOSMathProgModel)
         m.c[:],  # Seems to modify this
         m.h, m.b; m.options...)
 
+    t = time()
     flag = solve(ecos_prob_ptr)
+    m.solve_time = time() - t
     if flag == ECOS_OPTIMAL
         m.solve_stat = :Optimal
     elseif flag == ECOS_PINF
@@ -437,3 +440,5 @@ function getvardual(m::ECOSMathProgModel)
     end
     return duals
 end
+
+getsolvetime(m::ECOSMathProgModel) = m.solve_time

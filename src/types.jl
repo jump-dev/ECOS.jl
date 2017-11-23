@@ -23,14 +23,14 @@ const ECOS_SIGINT       = -4  # solver interrupted by a signal/ctrl-c
 const ECOS_FATAL        = -7  # Unknown problem in solver
 
 
-immutable Clpcone
+struct Clpcone
     p::Clong
     w::Ptr{Cdouble}
     v::Ptr{Cdouble}
     kkt_idx::Ptr{Clong}
 end
 
-immutable Csocone
+struct Csocone
     p::Clong
     skbar::Ptr{Cdouble}
     zkbar::Ptr{Cdouble}
@@ -46,13 +46,13 @@ immutable Csocone
     v1::Cdouble
 end
 
-immutable Ccone
+struct Ccone
     lpcone::Ptr{Clpcone}
     socone::Ptr{Csocone}
     nsoc::Clong
 end
 
-immutable Cspmat
+struct Cspmat
     jc::Ptr{Clong}
     ir::Ptr{Clong}
     pr::Ptr{Cdouble}
@@ -61,7 +61,7 @@ immutable Cspmat
     nnz::Clong
 end
 
-immutable Ckkt
+struct Ckkt
     PKPt::Ptr{Cspmat}
     L::Ptr{Cspmat}
     D::Ptr{Cdouble}
@@ -90,7 +90,7 @@ immutable Ckkt
     delta::Cdouble
 end
 
-immutable Cstats
+struct Cstats
     pcost::Cdouble
     dcost::Cdouble
     pres::Cdouble
@@ -122,7 +122,7 @@ immutable Cstats
     tfactor_t2::Cdouble
 end
 
-immutable Csettings
+struct Csettings
     gamma::Cdouble
     delta::Cdouble
     eps::Cdouble
@@ -141,7 +141,7 @@ immutable Csettings
 end
 
 if VersionNumber(ver()) >= v"2.0.5"
-    @eval immutable Cpwork
+    @eval struct Cpwork
         # Dimensions
         n::Clong
         m::Clong
@@ -230,7 +230,7 @@ if VersionNumber(ver()) >= v"2.0.5"
         stgs::Ptr{Csettings}
     end
 else
-    @eval immutable Cpwork
+    @eval struct Cpwork
         # Dimensions
         n::Clong
         m::Clong

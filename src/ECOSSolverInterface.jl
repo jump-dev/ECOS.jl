@@ -12,12 +12,12 @@ importall MathProgBase.SolverInterface
 #############################################################################
 # Define the MPB Solver and Model objects
 export ECOSSolver
-immutable ECOSSolver <: AbstractMathProgSolver
+struct ECOSSolver <: AbstractMathProgSolver
     options
 end
 ECOSSolver(;kwargs...) = ECOSSolver(kwargs)
 
-type ECOSMathProgModel <: AbstractConicModel
+mutable struct ECOSMathProgModel <: AbstractConicModel
     nvar::Int                           # Number of variables
     nconstr::Int                        # Number of rows in the MPB-form A matrix
     nineq::Int                          # Number of inequalities Gx <=_K h

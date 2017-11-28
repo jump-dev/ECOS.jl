@@ -127,6 +127,9 @@ end
 # user to fiddle with internals of the sparse matrix format
 # User can pass nothing as argument for A, b, and q
 function setup(n, m, p, l, ncones, q, e, G, A, c, h, b; options...)
+    @assert m == l + sum(q) + 3e
+    @assert length(c) == n
+    @assert ncones == length(q)
     if A == nothing
         if b != nothing
             @assert length(b) == 0
@@ -140,12 +143,15 @@ function setup(n, m, p, l, ncones, q, e, G, A, c, h, b; options...)
         numrow, numcol = size(A)
         @assert numcol == n
         @assert numrow == length(b)
+        @assert numrow == p
         sparseA = sparse(A)
         Apr = convert(Vector{Float64}, sparseA.nzval)
         Ajc = sparseA.colptr - 1  # C is 0-based
         Air = sparseA.rowval - 1
     end
 
+    @assert size(G) == (m, n)
+    @assert m == length(h)
     sparseG = sparse(G)
     Gpr = convert(Vector{Float64}, sparseG.nzval)
     Gjc = sparseG.colptr - 1  # C is 0-based

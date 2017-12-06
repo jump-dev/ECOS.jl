@@ -43,8 +43,22 @@ function __init__()
     end
 end
 
-include("ECOSSolverInterface.jl")  # MathProgBase interface
 include("types.jl")  # All the types and constants defined in ecos.h
+
+# A julia container for matrices passed to ECOS.
+# This makes it easy for the Julia GC to track these arrays.
+# The format matches ECOS's spmat: 0-based compressed sparse column (CSC)
+struct ECOSMatrix
+    pr::Vector{Cdouble} # nzval
+    jc::Vector{Clong}   # colptr
+    ir::Vector{Clong}   # rowval
+end
+
+function ECOSMatrix(mat::AbstractMatrix)
+    sparsemat = sparse(mat)
+    return ECOSMatrix(sparsemat.nzval, sparsemat.colptr .- 1, sparsemat.rowval .- 1)
+end
+
 
 # setup  (direct interface)
 # Provide ECOS with a problem in the form
@@ -66,27 +80,25 @@ include("types.jl")  # All the types and constants defined in ecos.h
 #               e.g. cone 1 is indices 4:6, cone 2 is indices 7:10
 #                    ->  q = [3, 4]
 #   e       Number of exponential cones present in problem
-#   Gpr, Gjc, Gir
-#           Non-zeros, column indices, and the row index arrays, respectively,
-#           for the matrix G represented in column compressed storage (CCS) format
-#           which is equivalent to Julia's SparseMatrixCSC
-#   Apr, Ajc, Air
-#           Equivalent to above for the matrix A.
+#   G       The G matrix in ECOSMatrix format.
+#   A       The A matrix in ECOSMatrix format.
 #           Can be all nothing if no equalities are present.
 #   c       Objective coefficients, length(c) == n
 #   h       RHS for inequality constraints, length(h) == m
 #   b       RHS for equality constraints, length(b) == b (can be nothing)
 # Returns a pointer to the ECOS pwork structure (Cpwork in ECOS.jl). See
 # types.jl for more information.
+# **NOTE**: ECOS retains references to the problem data passed in here.
+# You *must* ensure that G, A, c, h, and b are not freed until after cleanup(), otherwise
+# memory corruption will occur.
 function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int},Void}, e::Int,
-                Gpr::Vector{Float64}, Gjc::Vector{Int}, Gir::Vector{Int},
-                Apr::Union{Vector{Float64},Void}, Ajc::Union{Vector{Int},Void}, Air::Union{Vector{Int},Void},
-                c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Void}; kwargs...)
+               G::ECOSMatrix, A::Union{ECOSMatrix, Void},
+               c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Void}; kwargs...)
     # Convert to canonical forms
     q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
-    Apr = (Apr == nothing) ? convert(Ptr{Cdouble}, C_NULL) : Apr
-    Ajc = (Ajc == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Ajc)
-    Air = (Air == nothing) ? convert(Ptr{Cdouble}, C_NULL) : convert(Vector{Clong},Air)
+    Apr = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.pr
+    Ajc = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.jc
+    Air = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.ir
     b = (b == nothing) ? convert(Ptr{Cdouble}, C_NULL) : b
     problem_ptr = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork},
         (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Clong,
@@ -94,7 +106,7 @@ function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int}
          Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
          Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}),
         n, m, p, l, ncones, q, e,
-        Gpr, convert(Vector{Clong},Gjc), convert(Vector{Clong},Gir),
+        G.pr, G.jc, G.ir,
         Apr, Ajc, Air,
         c, h, b)
 
@@ -122,47 +134,6 @@ function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int}
     problem_ptr
 end
 
-# setup  (more general interface)
-# A more tolerant version of the above method that doesn't require
-# user to fiddle with internals of the sparse matrix format
-# User can pass nothing as argument for A, b, and q
-function setup(n, m, p, l, ncones, q, e, G, A, c, h, b; options...)
-    @assert m == l + sum(q) + 3e
-    @assert length(c) == n
-    @assert ncones == length(q)
-    if A == nothing
-        if b != nothing
-            @assert length(b) == 0
-            b = nothing
-        end
-        @assert p == 0
-        Apr = nothing
-        Ajc = nothing
-        Air = nothing
-    else
-        numrow, numcol = size(A)
-        @assert numcol == n
-        @assert numrow == length(b)
-        @assert numrow == p
-        sparseA = sparse(A)
-        Apr = convert(Vector{Float64}, sparseA.nzval)
-        Ajc = sparseA.colptr - 1  # C is 0-based
-        Air = sparseA.rowval - 1
-    end
-
-    @assert size(G) == (m, n)
-    @assert m == length(h)
-    sparseG = sparse(G)
-    Gpr = convert(Vector{Float64}, sparseG.nzval)
-    Gjc = sparseG.colptr - 1  # C is 0-based
-    Gir = sparseG.rowval - 1
-
-    setup(  n, m, p, l, ncones, q, e,
-            Gpr, Gjc, Gir,
-            Apr, Ajc, Air,
-            c, h, b; options...)
-end
-
 # solve
 # Solves the provided problem. Results are stored inside the structure,
 # but currently there is no convenient interface-provided way to access
@@ -177,5 +148,7 @@ end
 function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
     ccall((:ECOS_cleanup, ECOS.ecos), Void, (Ptr{Cpwork}, Clong), problem, keepvars)
 end
+
+include("ECOSSolverInterface.jl")  # MathProgBase interface
 
 end # module

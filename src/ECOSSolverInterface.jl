@@ -26,8 +26,8 @@ mutable struct ECOSMathProgModel <: AbstractConicModel
     ncones::Int                         # Number of SO cones
     conedims::Vector{Int}               # Dimension of each SO cone
     nexp_cones::Int                     # Number of exponential cones
-    G::SparseMatrixCSC{Float64,Int}     # The G matrix (inequalties)
-    A::SparseMatrixCSC{Float64,Int}     # The A matrix (equalities)
+    G::ECOSMatrix                       # The G matrix (inequalties)
+    A::ECOSMatrix                       # The A matrix (equalities)
     c::Vector{Float64}                  # The objective coeffs (always min)
     orig_sense::Symbol                  # Original objective sense
     h::Vector{Float64}                  # RHS for inequality
@@ -55,8 +55,8 @@ mutable struct ECOSMathProgModel <: AbstractConicModel
 end
 ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,0,
                                         Int[],0,
-                                        spzeros(0,0),
-                                        spzeros(0,0),
+                                        ECOSMatrix(spzeros(0,0)),
+                                        ECOSMatrix(spzeros(0,0)),
                                         Float64[], :Min,
                                         Float64[], Float64[],
                                         :NotSolved, 0.0, 0.0,
@@ -85,8 +85,9 @@ function optimize!(m::ECOSMathProgModel)
         m.nvar, m.nineq, m.neq,
         m.npos, m.ncones, m.conedims, m.nexp_cones,
         m.G, m.A,
-        m.c[:],  # Seems to modify this
+        m.c,
         m.h, m.b; m.options...)
+    # Note: ECOS modifies problem data in setup() and restores it on cleanup()
 
     t = time()
     flag = solve(ecos_prob_ptr)
@@ -109,8 +110,9 @@ function optimize!(m::ECOSMathProgModel)
     m.primal_sol = unsafe_wrap(Array,ecos_prob.x, m.nvar)[:]
     m.dual_sol_eq   = unsafe_wrap(Array,ecos_prob.y, m.neq)[:]
     m.dual_sol_ineq = unsafe_wrap(Array,ecos_prob.z, m.nineq)[:]
-    m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
     cleanup(ecos_prob_ptr, 0)
+    # Compute this value after cleanup with restored c.
+    m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
 end
 
 status(m::ECOSMathProgModel) = m.solve_stat
@@ -391,8 +393,8 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     m.ncones        = num_SOC_cones     # Num second-order cones
     m.conedims      = SOC_conedims      # Num contr. in each SOC
     m.nexp_cones    = num_exp_cones     # Num exponential cones
-    m.G             = ecos_G
-    m.A             = ecos_A
+    m.G             = ECOSMatrix(ecos_G)
+    m.A             = ECOSMatrix(ecos_A)
     m.c             = ecos_c
     m.orig_sense    = :Min
     m.h             = ecos_h

@@ -7,7 +7,9 @@
 # Test the direct interface for the ECOS.jl solver wrapper
 #############################################################################
 
-using Base.Test
+using Compat.Test
+using Compat.LinearAlgebra
+using Compat.SparseArrays
 
 # The values below are copied from data.h in ECOS source code
 import ECOS
@@ -56,9 +58,9 @@ end
 test1()
 
 function test2()
-    #= 
+    #=
     Original problem:
-    
+
     Max   x
     s.t.  x = 3
           8u + 9v <= 25
@@ -66,7 +68,7 @@ function test2()
           x free
           u <= 0
           v >= 0
-    
+
     ECOS form:
 
     Min  -x

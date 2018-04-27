@@ -20,6 +20,7 @@ end
 
 # Run the conic interface test from MathProgBase.jl
 import ECOS
+using Compat.Pkg
 include(joinpath(Pkg.dir("MathProgBase"),"test","conicinterface.jl"))
 coniclineartest(ECOS.ECOSSolver(), duals=true)
 conicSOCtest(ECOS.ECOSSolver(), duals=true)

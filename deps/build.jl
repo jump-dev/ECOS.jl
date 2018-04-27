@@ -1,10 +1,11 @@
 using BinDeps
+using Compat
 
 @BinDeps.setup
 
 ecos = library_dependency("ecos", aliases=["libecos"])
 
-if is_apple()
+if Compat.Sys.isapple()
     using Homebrew
     provides( Homebrew.HB, "ecos", ecos, os = :Darwin )
 end

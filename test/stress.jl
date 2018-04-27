@@ -1,4 +1,5 @@
 # Generates a random cone problem to test the MPB interface perf
+using Compat.SparseArrays
 
 rows = 10000
 cols = 10000

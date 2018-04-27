@@ -7,17 +7,18 @@
 # MathProgBase.jl interface for the ECOS.jl solver wrapper
 #############################################################################
 
-importall MathProgBase.SolverInterface
+import MathProgBase
+const MPB = MathProgBase
 
 #############################################################################
 # Define the MPB Solver and Model objects
 export ECOSSolver
-struct ECOSSolver <: AbstractMathProgSolver
+struct ECOSSolver <: MPB.AbstractMathProgSolver
     options
 end
 ECOSSolver(;kwargs...) = ECOSSolver(kwargs)
 
-mutable struct ECOSMathProgModel <: AbstractConicModel
+mutable struct ECOSMathProgModel <: MPB.AbstractConicModel
     nvar::Int                           # Number of variables
     nconstr::Int                        # Number of rows in the MPB-form A matrix
     nineq::Int                          # Number of inequalities Gx <=_K h
@@ -76,11 +77,11 @@ ECOSMathProgModel(;kwargs...) = ECOSMathProgModel(0,0,0,0,0,0,
 # - numconstr
 # http://mathprogbasejl.readthedocs.org/en/latest/lowlevel.html
 
-ConicModel(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
-LinearQuadraticModel(s::ECOSSolver) = ConicToLPQPBridge(ConicModel(s))
+MPB.ConicModel(s::ECOSSolver) = ECOSMathProgModel(;s.options...)
+MPB.LinearQuadraticModel(s::ECOSSolver) = MPB.ConicToLPQPBridge(MPB.ConicModel(s))
 
 
-function optimize!(m::ECOSMathProgModel)
+function MPB.optimize!(m::ECOSMathProgModel)
     ecos_prob_ptr = setup(
         m.nvar, m.nineq, m.neq,
         m.npos, m.ncones, m.conedims, m.nexp_cones,
@@ -115,12 +116,12 @@ function optimize!(m::ECOSMathProgModel)
     m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
 end
 
-status(m::ECOSMathProgModel) = m.solve_stat
-getobjval(m::ECOSMathProgModel) = m.obj_val
-getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
+MPB.status(m::ECOSMathProgModel) = m.solve_stat
+MPB.getobjval(m::ECOSMathProgModel) = m.obj_val
+MPB.getsolution(m::ECOSMathProgModel) = m.primal_sol[m.fwd_map]
 
-numvar(m::ECOSMathProgModel) = m.nvar
-numconstr(m::ECOSMathProgModel) = m.nineq + m.neq
+MPB.numvar(m::ECOSMathProgModel) = m.nvar
+MPB.numconstr(m::ECOSMathProgModel) = m.nineq + m.neq
 
 #############################################################################
 # Begin implementation of the MPB conic interface
@@ -130,15 +131,15 @@ numconstr(m::ECOSMathProgModel) = m.nineq + m.neq
 # - getconicdual
 # http://mathprogbasejl.readthedocs.org/en/latest/conic.html
 
-supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:ExpPrimal]
+MPB.supportedcones(m::ECOSSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:ExpPrimal]
 
-function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
+function MPB.loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     if size(A,2) == 0
         Base.warn("Input matrix has no columns. ECOS is known to crash in this corner case.")
     end
     m.nconstr = size(A,1)
     # If A is sparse, we should use an appropriate "zeros"
-    const zeromat = isa(A,SparseMatrixCSC) ? spzeros : zeros
+    zeromat = isa(A,SparseMatrixCSC) ? spzeros : zeros
 
     # We don't support SOCRotated, SDP, or ExpDual
     bad_cones = [:SOCRotated, :SDP, :ExpDual]
@@ -172,10 +173,10 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
 
     # Allocate space for the ECOS variables
     num_vars = length(c)
-    fwd_map = Array{Int}(num_vars)  # Will be used for SOCs
-    rev_map = Array{Int}(num_vars)  # Need to restore sol. vec.
-    idxcone = Array{Symbol}(num_vars)  # We'll use this for non-SOC/Exp
-    m.col_map_type = Array{Symbol}(num_vars) # In MPB indices
+    fwd_map = Array{Int}(undef, num_vars)  # Will be used for SOCs
+    rev_map = Array{Int}(undef, num_vars)  # Need to restore sol. vec.
+    idxcone = Array{Symbol}(undef, num_vars)  # We'll use this for non-SOC/Exp
+    m.col_map_type = Array{Symbol}(undef, num_vars) # In MPB indices
 
     # Now build the mapping between MPB variables and ECOS variables
     pos = 1
@@ -197,7 +198,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
     # Mapping for duals
     m.col_map_ind = zeros(Int,num_vars)
     m.row_map_ind = zeros(Int, length(b))
-    m.row_map_type  = Array{Symbol}(length(b))
+    m.row_map_type  = Array{Symbol}(undef, length(b))
     function update_row_map(cone_type, cur_ind)
         for (cone,idxs) in constr_cones
             if cone == cone_type
@@ -403,7 +404,7 @@ function loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones)
 end
 
 
-function getdual(m::ECOSMathProgModel)
+function MPB.getdual(m::ECOSMathProgModel)
     duals = zeros(length(m.row_map_ind))
     for (mpb_row,ecos_row) in enumerate(m.row_map_ind)
         cone = m.row_map_type[mpb_row]
@@ -423,7 +424,7 @@ function getdual(m::ECOSMathProgModel)
 end
 
 
-function getvardual(m::ECOSMathProgModel)
+function MPB.getvardual(m::ECOSMathProgModel)
     duals = zeros(length(m.col_map_ind))
     for (mpb_col,ecos_row) in enumerate(m.col_map_ind)
         cone = m.col_map_type[mpb_col]
@@ -443,4 +444,4 @@ function getvardual(m::ECOSMathProgModel)
     return duals
 end
 
-getsolvetime(m::ECOSMathProgModel) = m.solve_time
+MPB.getsolvetime(m::ECOSMathProgModel) = m.solve_time

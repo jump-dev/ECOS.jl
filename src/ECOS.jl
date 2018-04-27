@@ -8,8 +8,11 @@
 #############################################################################
 
 __precompile__()
-
 module ECOS
+
+using Compat
+using Compat.SparseArrays
+using Compat.LinearAlgebra
 
 # Try to load the binary dependency
 if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
@@ -91,9 +94,9 @@ end
 # **NOTE**: ECOS retains references to the problem data passed in here.
 # You *must* ensure that G, A, c, h, and b are not freed until after cleanup(), otherwise
 # memory corruption will occur.
-function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int},Void}, e::Int,
-               G::ECOSMatrix, A::Union{ECOSMatrix, Void},
-               c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Void}; kwargs...)
+function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int},Nothing}, e::Int,
+               G::ECOSMatrix, A::Union{ECOSMatrix, Nothing},
+               c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Nothing}; kwargs...)
     # Convert to canonical forms
     q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
     Apr = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.pr
@@ -126,7 +129,7 @@ function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int}
             setting in keys(options) ?
             convert(fieldtype(typeof(settings), setting), options[setting]) :
             getfield(settings, setting)
-            for setting in fieldnames(settings)]...)
+            for setting in fieldnames(typeof(settings))]...)
 
         unsafe_store!(problem.stgs, new_settings)
     end
@@ -146,7 +149,7 @@ end
 # Frees memory allocated by ECOS for the problem.
 # The optional keepvars argument is number of variables to NOT free.
 function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
-    ccall((:ECOS_cleanup, ECOS.ecos), Void, (Ptr{Cpwork}, Clong), problem, keepvars)
+    ccall((:ECOS_cleanup, ECOS.ecos), Cvoid, (Ptr{Cpwork}, Clong), problem, keepvars)
 end
 
 include("ECOSSolverInterface.jl")  # MathProgBase interface

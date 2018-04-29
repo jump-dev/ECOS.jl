@@ -21,6 +21,7 @@ end
 @testset "MathProgBase" begin
     include("MPBWrapper.jl")
 end
+
 @testset "MathOptInterface" begin
     include("MOIWrapper.jl")
 end

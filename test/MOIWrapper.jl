@@ -15,5 +15,5 @@ const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 end
 
 @testset "Continuous conic problems" begin
-    MOIT.contconictest(optimizer, config, ["rsoc", "geomean", "sdp", "rootdet", "logdet"])
+    MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(optimizer)), config, ["sdp", "rootdet", "logdet"])
 end

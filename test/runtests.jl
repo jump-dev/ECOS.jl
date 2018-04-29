@@ -7,6 +7,8 @@
 # Test the ECOS.jl solver wrapper
 #############################################################################
 
+using ECOS
+
 using Compat
 using Compat.Test
 

@@ -7,24 +7,17 @@
 # Test the ECOS.jl solver wrapper
 #############################################################################
 
-tests = ["direct.jl",
-         "options.jl",
-         "mpb_linear.jl"]
+using Compat
+using Compat.Test
 
-println("Running tests:")
-
-for curtest in tests
-    println(" Test: $(curtest)")
-    include(curtest)
+@testset "Test the direct interface" begin
+    include("direct.jl")
 end
 
-# Run the conic interface test from MathProgBase.jl
-import ECOS
-using Compat.Pkg
-include(joinpath(Pkg.dir("MathProgBase"),"test","conicinterface.jl"))
-coniclineartest(ECOS.ECOSSolver(), duals=true)
-conicSOCtest(ECOS.ECOSSolver(), duals=true)
-conicEXPtest(ECOS.ECOSSolver(), duals=true)
+@testset "Test passing options" begin
+    include("options.jl")
+end
 
-include(joinpath(Pkg.dir("MathProgBase"),"test","quadprog.jl"))
-socptest(ECOS.ECOSSolver())
+@testset "MathProgBase" begin
+    include("MPBWrapper.jl")
+end

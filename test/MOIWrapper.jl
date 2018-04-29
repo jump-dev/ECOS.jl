@@ -1,6 +1,3 @@
-using MathOptInterfaceECOS
-using Base.Test
-
 using MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test

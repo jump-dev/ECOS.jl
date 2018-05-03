@@ -20,7 +20,7 @@ struct Solution
 end
 Solution() = Solution(0, Float64[], Float64[], Float64[], Float64[], NaN)
 
-mutable struct Data
+mutable struct ModelData
     m::Int
     n::Int
     IA::Vector{Int}
@@ -57,7 +57,7 @@ end
 mutable struct ECOSOptimizer <: MOI.AbstractOptimizer
     cone::Cone
     maxsense::Bool
-    data::Union{Void, Data} # only non-Void between MOI.copy! and MOI.optimize!
+    data::Union{Void, ModelData} # only non-Void between MOI.copy! and MOI.optimize!
     sol::Solution
     function ECOSOptimizer()
         new(Cone(), false, nothing, Solution())
@@ -79,7 +79,6 @@ MOI.supports(::ECOSOptimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{F
 MOI.supportsconstraint(::ECOSOptimizer, ::Type{<:SF}, ::Type{<:SS}) = true
 MOI.copy!(dest::ECOSOptimizer, src::MOI.ModelLike; copynames=true) = MOIU.allocateload!(dest, src, copynames)
 
-# Implements optimize! : translate data to ECOSData and call ECOS_solve
 using Compat.SparseArrays
 
 const ZeroCones = Union{MOI.EqualTo, MOI.Zeros}
@@ -132,8 +131,8 @@ constrrows(s::MOI.AbstractVectorSet) = 1:MOI.dimension(s)
 constrrows(instance::ECOSOptimizer, ci::CI{<:MOI.AbstractScalarFunction, <:MOI.AbstractScalarSet}) = 1
 constrrows(instance::ECOSOptimizer, ci::CI{<:MOI.AbstractVectorFunction, MOI.Zeros}) = 1:instance.cone.eqnrows[constroffset(instance, ci)]
 constrrows(instance::ECOSOptimizer, ci::CI{<:MOI.AbstractVectorFunction, <:MOI.AbstractVectorSet}) = 1:instance.cone.ineqnrows[constroffset(instance, ci)]
-matrix(data::Data, s::ZeroCones) = data.b, data.IA, data.JA, data.VA
-matrix(data::Data, s::Union{LPCones, MOI.SecondOrderCone, MOI.ExponentialCone}) = data.h, data.IG, data.JG, data.VG
+matrix(data::ModelData, s::ZeroCones) = data.b, data.IA, data.JA, data.VA
+matrix(data::ModelData, s::Union{LPCones, MOI.SecondOrderCone, MOI.ExponentialCone}) = data.h, data.IG, data.JG, data.VG
 matrix(instance::ECOSOptimizer, s) = matrix(instance.data, s)
 MOIU.canloadconstraint(::ECOSOptimizer, ::Type{<:SF}, ::Type{<:SS}) = true
 MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.SingleVariable, s) = MOIU.loadconstraint!(instance, ci, MOI.ScalarAffineFunction{Float64}(f), s)
@@ -213,7 +212,7 @@ function MOIU.loadvariables!(instance::ECOSOptimizer, nvars::Integer)
     VG = Float64[]
     h = zeros(m)
     c = zeros(nvars)
-    instance.data = Data(m, nvars, IA, JA, VA, b, IG, JG, VG, h, 0., c)
+    instance.data = ModelData(m, nvars, IA, JA, VA, b, IG, JG, VG, h, 0., c)
 end
 
 MOIU.canallocate(::ECOSOptimizer, ::MOI.ObjectiveSense) = true

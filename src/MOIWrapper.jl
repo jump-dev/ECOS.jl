@@ -126,9 +126,6 @@ end
 scalecoef(rows, coef, minus, s) = minus ? -coef : coef
 scalecoef(rows, coef, minus, s::Union{MOI.LessThan, Type{<:MOI.LessThan}, MOI.Nonpositives, Type{MOI.Nonpositives}}) = minus ? coef : -coef
 _varmap(f) = map(vi -> vi.value, f.variables)
-_constant(s::MOI.EqualTo) = s.value
-_constant(s::MOI.GreaterThan) = s.lower
-_constant(s::MOI.LessThan) = s.upper
 constrrows(::MOI.AbstractScalarSet) = 1
 constrrows(s::MOI.AbstractVectorSet) = 1:MOI.dimension(s)
 constrrows(instance::ECOSOptimizer, ci::CI{<:MOI.AbstractScalarFunction, <:MOI.AbstractScalarSet}) = 1
@@ -148,7 +145,7 @@ function MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.ScalarAffineFu
     i = offset + row
     # The ECOS format is b - Ax ∈ cone
     # so minus=false for b and minus=true for A
-    setconstant = _constant(s)
+    setconstant = MOIU.getconstant(s)
     if s isa MOI.EqualTo
         instance.cone.eqsetconstant[offset] = setconstant
     else

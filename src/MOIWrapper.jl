@@ -20,18 +20,21 @@ struct Solution
 end
 Solution() = Solution(0, Float64[], Float64[], Float64[], Float64[], NaN)
 
+# Used to build the data with allocate-load during `copy!`.
+# When `optimize!` is called, a the data is used to build `ECOSMatrix`
+# and the `ModelData` struct is discarded
 mutable struct ModelData
-    m::Int
-    n::Int
-    IA::Vector{Int}
-    JA::Vector{Int}
-    VA::Vector{Float64}
-    b::Vector{Float64}
-    IG::Vector{Int}
-    JG::Vector{Int}
-    VG::Vector{Float64}
-    h::Vector{Float64}
-    objconstant::Float64
+    m::Int # Number of rows/constraints
+    n::Int # Number of cols/variables
+    IA::Vector{Int} # List of conic rows
+    JA::Vector{Int} # List of conic cols
+    VA::Vector{Float64} # List of conic coefficients
+    b::Vector{Float64} # List of conic coefficients
+    IG::Vector{Int} # List of equality rows
+    JG::Vector{Int} # List of equality cols
+    VG::Vector{Float64} # List of equality coefficients
+    h::Vector{Float64} # List of equality coefficients
+    objconstant::Float64 # The objective is min c'x + objconstant
     c::Vector{Float64}
 end
 

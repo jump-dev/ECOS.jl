@@ -175,11 +175,7 @@ function MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.VectorAffineFu
     A = sparse(f.outputindex, _varmap(f), f.coefficients)
     # sparse combines duplicates with + but does not remove zeros created so we call dropzeros!
     dropzeros!(A)
-    colval = zeros(Int, length(A.rowval))
-    for col in 1:A.n
-        colval[A.colptr[col]:(A.colptr[col+1]-1)] = col
-    end
-    @assert !any(iszero.(colval))
+    I, J, V = findnz(A)
     offset = constroffset(instance, ci)
     rows = constrrows(s)
     if s isa MOI.Zeros
@@ -190,11 +186,11 @@ function MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.VectorAffineFu
     i = offset + rows
     # The ECOS format is b - Ax ∈ cone
     # so minus=false for b and minus=true for A
-    b, I, J, V = matrix(instance, s)
+    b, Is, Js, Vs = matrix(instance, s)
     b[i] = scalecoef(rows, orderval(f.constant, s), false, s)
-    append!(I, offset + orderidx(A.rowval, s))
-    append!(J, colval)
-    append!(V, scalecoef(A.rowval, A.nzval, true, s))
+    append!(Is, offset + orderidx(I, s))
+    append!(Js, J)
+    append!(Vs, scalecoef(I, V, true, s))
 end
 
 function MOIU.allocatevariables!(instance::ECOSOptimizer, nvars::Integer)

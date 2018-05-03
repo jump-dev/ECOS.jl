@@ -38,16 +38,18 @@ mutable struct ModelData
     c::Vector{Float64}
 end
 
+# This is tied to ECOS's internal representation
 mutable struct ConeData
     f::Int # number of linear equality constraints
     l::Int # length of LP cone
     q::Int # length of SOC cone
     qa::Vector{Int} # array of second-order cone constraints
     ep::Int # number of primal exponential cone triples
-    eqsetconstant::Dict{Int, Float64} # For the constant of EqualTo
-    eqnrows::Dict{Int, Int} # The number of rows of Zeros
+    # The following four field store model information needed to compute `ConstraintPrimal` and `ConstraintDual`
+    eqsetconstant::Dict{Int, Float64}   # For the constant of EqualTo
+    eqnrows::Dict{Int, Int}             # The number of rows of Zeros
     ineqsetconstant::Dict{Int, Float64} # For the constant of LessThan and GreaterThan
-    ineqnrows::Dict{Int, Int} # The number of rows of each vector sets except Zeros
+    ineqnrows::Dict{Int, Int}           # The number of rows of each vector sets except Zeros
     function ConeData()
         new(0, 0, 0, Int[], 0,
             Dict{Int, Float64}(),
@@ -304,6 +306,7 @@ function MOI.get(instance::ECOSOptimizer, ::MOI.VariablePrimal, vi::VI)
     instance.sol.primal[vi.value]
 end
 MOI.get(instance::ECOSOptimizer, a::MOI.VariablePrimal, vi::Vector{VI}) = MOI.get.(instance, a, vi)
+# setconstant: Retrieve set constant stored in `ConeData` during `copy!`
 setconstant(instance::ECOSOptimizer, offset, ::CI{<:MOI.AbstractFunction, <:MOI.EqualTo}) = instance.cone.eqsetconstant[offset]
 setconstant(instance::ECOSOptimizer, offset, ::CI) = instance.cone.ineqsetconstant[offset]
 _unshift(instance::ECOSOptimizer, offset, value, ::CI) = value

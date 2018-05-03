@@ -35,7 +35,7 @@ mutable struct ModelData
     c::Vector{Float64}
 end
 
-mutable struct Cone
+mutable struct ConeData
     f::Int # number of linear equality constraints
     l::Int # length of LP cone
     q::Int # length of SOC cone
@@ -45,7 +45,7 @@ mutable struct Cone
     eqnrows::Dict{Int, Int} # The number of rows of Zeros
     ineqsetconstant::Dict{Int, Float64} # For the constant of LessThan and GreaterThan
     ineqnrows::Dict{Int, Int} # The number of rows of each vector sets except Zeros
-    function Cone()
+    function ConeData()
         new(0, 0, 0, Int[], 0,
             Dict{Int, Float64}(),
             Dict{Int, UnitRange{Int}}(),
@@ -55,12 +55,12 @@ mutable struct Cone
 end
 
 mutable struct ECOSOptimizer <: MOI.AbstractOptimizer
-    cone::Cone
+    cone::ConeData
     maxsense::Bool
     data::Union{Void, ModelData} # only non-Void between MOI.copy! and MOI.optimize!
     sol::Solution
     function ECOSOptimizer()
-        new(Cone(), false, nothing, Solution())
+        new(ConeData(), false, nothing, Solution())
     end
 end
 
@@ -88,27 +88,27 @@ _dim(s::MOI.AbstractScalarSet) = 1
 _dim(s::MOI.AbstractVectorSet) = MOI.dimension(s)
 
 # Computes cone dimensions
-constroffset(cone::Cone, ci::CI{<:MOI.AbstractFunction, <:ZeroCones}) = ci.value
-function _allocateconstraint!(cone::Cone, f, s::ZeroCones)
+constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:ZeroCones}) = ci.value
+function _allocateconstraint!(cone::ConeData, f, s::ZeroCones)
     ci = cone.f
     cone.f += _dim(s)
     ci
 end
-constroffset(cone::Cone, ci::CI{<:MOI.AbstractFunction, <:LPCones}) = ci.value
-function _allocateconstraint!(cone::Cone, f, s::LPCones)
+constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:LPCones}) = ci.value
+function _allocateconstraint!(cone::ConeData, f, s::LPCones)
     ci = cone.l
     cone.l += _dim(s)
     ci
 end
-constroffset(cone::Cone, ci::CI{<:MOI.AbstractFunction, <:MOI.SecondOrderCone}) = cone.l + ci.value
-function _allocateconstraint!(cone::Cone, f, s::MOI.SecondOrderCone)
+constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:MOI.SecondOrderCone}) = cone.l + ci.value
+function _allocateconstraint!(cone::ConeData, f, s::MOI.SecondOrderCone)
     push!(cone.qa, s.dimension)
     ci = cone.q
     cone.q += _dim(s)
     ci
 end
-constroffset(cone::Cone, ci::CI{<:MOI.AbstractFunction, <:MOI.ExponentialCone}) = cone.l + cone.q + ci.value
-function _allocateconstraint!(cone::Cone, f, s::MOI.ExponentialCone)
+constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:MOI.ExponentialCone}) = cone.l + cone.q + ci.value
+function _allocateconstraint!(cone::ConeData, f, s::MOI.ExponentialCone)
     ci = 3cone.ep
     cone.ep += 1
     ci
@@ -196,7 +196,7 @@ function MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.VectorAffineFu
 end
 
 function MOIU.allocatevariables!(instance::ECOSOptimizer, nvars::Integer)
-    instance.cone = Cone()
+    instance.cone = ConeData()
     VI.(1:nvars)
 end
 

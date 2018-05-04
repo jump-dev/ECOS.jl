@@ -152,6 +152,7 @@ function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
     ccall((:ECOS_cleanup, ECOS.ecos), Cvoid, (Ptr{Cpwork}, Clong), problem, keepvars)
 end
 
-include("ECOSSolverInterface.jl")  # MathProgBase interface
+include("MPBWrapper.jl")
+include("MOIWrapper.jl")
 
 end # module

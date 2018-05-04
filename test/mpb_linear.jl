@@ -3,7 +3,7 @@
 # Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
 # See http://github.com/JuliaOpt/ECOS.jl
 #############################################################################
-# test/mpb.jl
+# test/mpb_linear.jl
 # Test the MathProgBase.jl interface for the ECOS.jl solver wrapper
 #############################################################################
 

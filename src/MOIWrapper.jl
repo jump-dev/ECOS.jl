@@ -127,7 +127,11 @@ end
 # Build constraint matrix
 scalecoef(rows, coef, minus, s) = minus ? -coef : coef
 scalecoef(rows, coef, minus, s::Union{MOI.LessThan, Type{<:MOI.LessThan}, MOI.Nonpositives, Type{MOI.Nonpositives}}) = minus ? coef : -coef
-_varmap(f) = map(vi -> vi.value, f.variables)
+output_index(t::MOI.VectorAffineTerm) = t.output_index
+variable_index_value(t::MOI.ScalarAffineTerm) = t.variable_index.value
+variable_index_value(t::MOI.VectorAffineTerm) = variable_index_value(t.scalar_term)
+coefficient(t::MOI.ScalarAffineTerm) = t.coefficient
+coefficient(t::MOI.VectorAffineTerm) = coefficient(t.scalar_term)
 constrrows(::MOI.AbstractScalarSet) = 1
 constrrows(s::MOI.AbstractVectorSet) = 1:MOI.dimension(s)
 constrrows(instance::ECOSOptimizer, ci::CI{<:MOI.AbstractScalarFunction, <:MOI.AbstractScalarSet}) = 1
@@ -139,7 +143,7 @@ matrix(instance::ECOSOptimizer, s) = matrix(instance.data, s)
 MOIU.canloadconstraint(::ECOSOptimizer, ::Type{<:SF}, ::Type{<:SS}) = true
 MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.SingleVariable, s) = MOIU.loadconstraint!(instance, ci, MOI.ScalarAffineFunction{Float64}(f), s)
 function MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.ScalarAffineFunction, s::MOI.AbstractScalarSet)
-    a = sparsevec(_varmap(f), f.coefficients)
+    a = sparsevec(variable_index_value.(f.terms), coefficient.(f.terms))
     # sparsevec combines duplicates with + but does not remove zeros created so we call dropzeros!
     dropzeros!(a)
     offset = constroffset(instance, ci)
@@ -172,7 +176,7 @@ function orderidx(idx, s::MOI.ExponentialCone)
     expmap.(idx)
 end
 function MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.VectorAffineFunction, s::MOI.AbstractVectorSet)
-    A = sparse(f.outputindex, _varmap(f), f.coefficients)
+    A = sparse(output_index.(f.terms), variable_index_value.(f.terms), coefficient.(f.terms))
     # sparse combines duplicates with + but does not remove zeros created so we call dropzeros!
     dropzeros!(A)
     I, J, V = findnz(A)
@@ -187,7 +191,7 @@ function MOIU.loadconstraint!(instance::ECOSOptimizer, ci, f::MOI.VectorAffineFu
     # The ECOS format is b - Ax ∈ cone
     # so minus=false for b and minus=true for A
     b, Is, Js, Vs = matrix(instance, s)
-    b[i] = scalecoef(rows, orderval(f.constant, s), false, s)
+    b[i] = scalecoef(rows, orderval(f.constants, s), false, s)
     append!(Is, offset + orderidx(I, s))
     append!(Js, J)
     append!(Vs, scalecoef(I, V, true, s))
@@ -224,7 +228,7 @@ MOIU.canload(::ECOSOptimizer, ::MOI.ObjectiveSense) = true
 function MOIU.load!(::ECOSOptimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense) end
 MOIU.canload(::ECOSOptimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}) = true
 function MOIU.load!(instance::ECOSOptimizer, ::MOI.ObjectiveFunction, f::MOI.ScalarAffineFunction)
-    c0 = full(sparsevec(_varmap(f), f.coefficients, instance.data.n))
+    c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms), instance.data.n))
     instance.data.objconstant = f.constant
     instance.data.c = instance.maxsense ? -c0 : c0
 end

@@ -64,8 +64,8 @@ weight = Dict(:Gold => 2.0,  :Silver => 1.5,  :Bronze => 0.3)
 
 m = Model(solver=ECOSSolver())
 @variable(m, 0 <= take[items] <= 1)  # Define a variable for each item
-@objective(m, Max, sum{ values[item] * take[item], item in items})
-@constraint(m, sum{ weight[item] * take[item], item in items} <= 3)
+@objective(m, Max, sum(values[item] * take[item] for item in items))
+@constraint(m, sum(weight[item] * take[item] for item in items) <= 3)
 solve(m)
 
 println(getvalue(take))

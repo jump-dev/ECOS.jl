@@ -64,8 +64,9 @@ mutable struct ECOSOptimizer <: MOI.AbstractOptimizer
     maxsense::Bool
     data::Union{Void, ModelData} # only non-Void between MOI.copy! and MOI.optimize!
     sol::Solution
-    function ECOSOptimizer()
-        new(ConeData(), false, nothing, Solution())
+    options
+    function ECOSOptimizer(; kwargs...)
+        new(ConeData(), false, nothing, Solution(), kwargs)
     end
 end
 
@@ -244,7 +245,8 @@ function MOI.optimize!(instance::ECOSOptimizer)
     objconstant = instance.data.objconstant
     c = instance.data.c
     instance.data = nothing # Allows GC to free instance.data before A is loaded to ECOS
-    ecos_prob_ptr = ECOS.setup(n, m, cone.f, cone.l, length(cone.qa), cone.qa, cone.ep, G, A, c, h, b)
+    ecos_prob_ptr = ECOS.setup(n, m, cone.f, cone.l, length(cone.qa), cone.qa,
+                               cone.ep, G, A, c, h, b; instance.options...)
     ret_val = ECOS.solve(ecos_prob_ptr)
     ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
     primal    = unsafe_wrap(Array, ecos_prob.x, n)[:]

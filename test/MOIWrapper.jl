@@ -5,7 +5,7 @@ const MOIB = MOI.Bridges
 
 const MOIU = MOI.Utilities
 MOIU.@model ECOSModelData () (EqualTo, GreaterThan, LessThan) (Zeros, Nonnegatives, Nonpositives, SecondOrderCone, ExponentialCone) () (SingleVariable,) (ScalarAffineFunction,) (VectorOfVariables,) (VectorAffineFunction,)
-const optimizer = MOIU.CachingOptimizer(ECOSModelData{Float64}(), ECOSOptimizer())
+const optimizer = MOIU.CachingOptimizer(ECOSModelData{Float64}(), ECOSOptimizer(verbose=false))
 
 # SOC2 requires 1e-4
 const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)

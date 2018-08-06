@@ -17,8 +17,9 @@ struct Solution
     dual_ineq::Vector{Float64}
     slack::Vector{Float64}
     objval::Float64
+    objbnd::Float64
 end
-Solution() = Solution(0, Float64[], Float64[], Float64[], Float64[], NaN)
+Solution() = Solution(0, Float64[], Float64[], Float64[], Float64[], NaN, NaN)
 
 # Used to build the data with allocate-load during `copy!`.
 # When `optimize!` is called, a the data is used to build `ECOSMatrix`
@@ -256,8 +257,16 @@ function MOI.optimize!(instance::ECOSOptimizer)
     dual_ineq = unsafe_wrap(Array, ecos_prob.z, m)[:]
     slack     = unsafe_wrap(Array, ecos_prob.s, m)[:]
     ECOS.cleanup(ecos_prob_ptr, 0)
-    objval = (instance.maxsense ? -1 : 1) * dot(c, primal) + objconstant
-    instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objval)
+    objval = (instance.maxsense ? -1 : 1) * dot(c, primal)
+    if ret_val != ECOS.ECOS_DINF
+        objval += objconstant
+    end
+    objbnd = -(dot(b, dual_eq) + dot(h, dual_ineq))
+    if ret_val != ECOS.ECOS_PINF
+        objbnd += objconstant
+    end
+    instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objval,
+                            objbnd)
 end
 
 # Implements getter for result value and statuses
@@ -281,6 +290,8 @@ end
 
 MOI.canget(instance::ECOSOptimizer, ::MOI.ObjectiveValue) = true
 MOI.get(instance::ECOSOptimizer, ::MOI.ObjectiveValue) = instance.sol.objval
+MOI.canget(instance::ECOSOptimizer, ::MOI.ObjectiveBound) = true
+MOI.get(instance::ECOSOptimizer, ::MOI.ObjectiveBound) = instance.sol.objbnd
 
 function MOI.canget(instance::ECOSOptimizer, ::MOI.PrimalStatus)
     instance.sol.ret_val != ECOS.ECOS_PINF

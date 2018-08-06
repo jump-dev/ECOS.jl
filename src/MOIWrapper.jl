@@ -234,6 +234,10 @@ function MOIU.load!(instance::ECOSOptimizer, ::MOI.ObjectiveFunction, f::MOI.Sca
 end
 
 function MOI.optimize!(instance::ECOSOptimizer)
+    if instance.data === nothing
+        # optimize! has already been called and no new model has been copied
+        return
+    end
     cone = instance.cone
     m = instance.data.m
     n = instance.data.n

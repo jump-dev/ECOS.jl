@@ -121,27 +121,24 @@ using Compat.SparseArrays
 const ZeroCones = Union{MOI.EqualTo, MOI.Zeros}
 const LPCones = Union{MOI.GreaterThan, MOI.LessThan, MOI.Nonnegatives, MOI.Nonpositives}
 
-_dim(s::MOI.AbstractScalarSet) = 1
-_dim(s::MOI.AbstractVectorSet) = MOI.dimension(s)
-
 # Computes cone dimensions
 constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:ZeroCones}) = ci.value
 function _allocateconstraint!(cone::ConeData, f, s::ZeroCones)
     ci = cone.f
-    cone.f += _dim(s)
+    cone.f += MOI.dimension(s)
     ci
 end
 constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:LPCones}) = ci.value
 function _allocateconstraint!(cone::ConeData, f, s::LPCones)
     ci = cone.l
-    cone.l += _dim(s)
+    cone.l += MOI.dimension(s)
     ci
 end
 constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:MOI.SecondOrderCone}) = cone.l + ci.value
 function _allocateconstraint!(cone::ConeData, f, s::MOI.SecondOrderCone)
     push!(cone.qa, s.dimension)
     ci = cone.q
-    cone.q += _dim(s)
+    cone.q += MOI.dimension(s)
     ci
 end
 constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:MOI.ExponentialCone}) = cone.l + cone.q + ci.value

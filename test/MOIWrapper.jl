@@ -17,8 +17,8 @@ end
 @testset "Continuous conic problems" begin
     exclude = ["sdp", "rootdet", "logdet"]
     @static if Compat.Sys.iswindows()
-        # Test exp3 fails for unknown reason on Windows 32 and 64 bits,
-        # just like EXP3 fails with the MPB wrapper
+        # Test exp3 fails  on Windows 32 and 64 bits because the windows
+        # binaries are out of date just like EXP3 fails with the MPB wrapper
         push!(exclude, "exp3")
     end
 

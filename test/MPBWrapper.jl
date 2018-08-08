@@ -21,6 +21,7 @@ import ECOS
         # binaries are out of date. There failure is:
         # Expression: (-(y[2]) * log(-(y[2]) / y[4]) + y[2]) - y[3] ≤ tol
         # Evaluated: 0.39942722775671957 ≤ 1.0e-6
+        # See https://github.com/JuliaOpt/ECOS.jl/issues/47
         conicEXPtest(ECOS.ECOSSolver(), duals=true)
     end
 

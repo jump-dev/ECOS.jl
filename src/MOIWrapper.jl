@@ -61,12 +61,17 @@ end
 mutable struct Optimizer <: MOI.AbstractOptimizer
     cone::ConeData
     maxsense::Bool
-    data::Union{Void, ModelData} # only non-Void between MOI.copy! and MOI.optimize!
+    data::Union{Nothing, ModelData} # only non-Nothing between MOI.copy! and MOI.optimize!
     sol::Solution
     options
     function Optimizer(; kwargs...)
         new(ConeData(), false, nothing, Solution(), kwargs)
     end
+end
+
+if VERSION >= v"0.7-"
+    # TODO remove when updating to MOI v0.6
+    Base.broadcastable(optimizer::Optimizer) = Ref(optimizer)
 end
 
 function MOI.isempty(instance::Optimizer)
@@ -214,12 +219,12 @@ function MOIU.loadconstraint!(instance::Optimizer, ci, f::MOI.VectorAffineFuncti
     else
         instance.cone.ineqnrows[offset] = length(rows)
     end
-    i = offset + rows
+    i = offset .+ rows
     # The ECOS format is b - Ax ∈ cone
     # so minus=false for b and minus=true for A
     b, Is, Js, Vs = matrix(instance, s)
-    b[i] = scalecoef(rows, orderval(f.constants, s), false, s)
-    append!(Is, offset + orderidx(I, s))
+    b[i] .= scalecoef(rows, orderval(f.constants, s), false, s)
+    append!(Is, offset .+ orderidx(I, s))
     append!(Js, J)
     append!(Vs, scalecoef(I, V, true, s))
 end
@@ -343,7 +348,7 @@ end
 function MOI.get(instance::Optimizer, ::MOI.VariablePrimal, vi::VI)
     instance.sol.primal[vi.value]
 end
-MOI.get(instance::Optimizer, a::MOI.VariablePrimal, vi::Vector{VI}) = MOI.get.(instance, a, vi)
+MOI.get(instance::Optimizer, a::MOI.VariablePrimal, vi::Vector{VI}) = MOI.get.(instance, Ref(a), vi)
 # setconstant: Retrieve set constant stored in `ConeData` during `copy!`
 setconstant(instance::Optimizer, offset, ::CI{<:MOI.AbstractFunction, <:MOI.EqualTo}) = instance.cone.eqsetconstant[offset]
 setconstant(instance::Optimizer, offset, ::CI) = instance.cone.ineqsetconstant[offset]
@@ -360,7 +365,7 @@ end
 function MOI.get(instance::Optimizer, ::MOI.ConstraintPrimal, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
     offset = constroffset(instance, ci)
     rows = constrrows(instance, ci)
-    _unshift(instance, offset, scalecoef(rows, reorderval(instance.sol.slack[offset + rows], S), false, S), ci)
+    _unshift(instance, offset, scalecoef(rows, reorderval(instance.sol.slack[offset .+ rows], S), false, S), ci)
 end
 
 function MOI.canget(instance::Optimizer, ::MOI.DualStatus)
@@ -390,7 +395,7 @@ _dual(instance, ci::CI) = instance.sol.dual_ineq
 function MOI.get(instance::Optimizer, ::MOI.ConstraintDual, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
     offset = constroffset(instance, ci)
     rows = constrrows(instance, ci)
-    scalecoef(rows, reorderval(_dual(instance, ci)[offset + rows], S), false, S)
+    scalecoef(rows, reorderval(_dual(instance, ci)[offset .+ rows], S), false, S)
 end
 
 MOI.canget(instance::Optimizer, ::MOI.ResultCount) = true

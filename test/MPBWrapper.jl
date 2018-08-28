@@ -33,9 +33,6 @@ end
         conicEXPtest(ECOS.ECOSSolver(), duals=true)
     end
 
-    # See https://github.com/JuliaOpt/MathProgBase.jl/pull/218
-    if VERSION < v"0.7-"
-        include(joinpath(MPB_test_path, "quadprog.jl"))
-        socptest(ECOS.ECOSSolver())
-    end
+    include(joinpath(MPB_test_path, "quadprog.jl"))
+    socptest(ECOS.ECOSSolver())
 end

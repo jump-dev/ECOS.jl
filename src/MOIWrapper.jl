@@ -69,8 +69,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     end
 end
 
-# TODO remove when updating to MOI v0.6
-Base.broadcastable(optimizer::Optimizer) = Ref(optimizer)
+if VERSION >= v"0.7-"
+    # TODO remove when updating to MOI v0.6
+    Base.broadcastable(optimizer::Optimizer) = Ref(optimizer)
+end
 
 function MOI.isempty(instance::Optimizer)
     !instance.maxsense && instance.data === nothing

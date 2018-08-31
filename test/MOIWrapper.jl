@@ -4,7 +4,16 @@ const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 
 const MOIU = MOI.Utilities
-MOIU.@model ECOSModelData () (EqualTo, GreaterThan, LessThan) (Zeros, Nonnegatives, Nonpositives, SecondOrderCone, ExponentialCone) () (SingleVariable,) (ScalarAffineFunction,) (VectorOfVariables,) (VectorAffineFunction,)
+MOIU.@model(ECOSModelData,
+            (),
+            (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan),
+            (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone,
+             MOI.ExponentialCone),
+            (),
+            (MOI.SingleVariable,),
+            (MOI.ScalarAffineFunction,),
+            (MOI.VectorOfVariables,),
+            (MOI.VectorAffineFunction,))
 const optimizer = MOIU.CachingOptimizer(ECOSModelData{Float64}(), ECOS.Optimizer(verbose=false))
 
 # SOC2 requires 1e-4

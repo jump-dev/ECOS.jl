@@ -375,7 +375,7 @@ function MPB.loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones
             append!(exp_rows, [idxs[1],idxs[3],idxs[2]])
 
             # override update_row_map to handle the permutation
-            m.row_map_type[idxs] = :ExpPrimal
+            m.row_map_type[idxs] .= :ExpPrimal
             m.row_map_ind[idxs[1]] = neq_cur_ind
             m.row_map_ind[idxs[3]] = neq_cur_ind+1
             m.row_map_ind[idxs[2]] = neq_cur_ind+2

@@ -14,10 +14,13 @@ You can install ECOS.jl through the Julia package manager:
 julia> Pkg.add("ECOS")
 ```
 
-ECOS.jl will automatically setup the ECOS solver itself:
- - On Linux it will build from source
- - On OS X it will download a binary via [Homebrew.jl].
- - On Windows it will download a binary.
+ECOS.jl will automatically install and setup the ECOS solver itself using [BinaryProvider.jl](https://github.com/JuliaPackaging/BinaryProvider.jl).
+
+## Custom Installation
+
+After ECOS.jl is installed and built, you can replace the installed binary dependencies with custom builds by overwritting the binaries and libraries in ECOS.jl's `deps/usr` folder (e.g. in Julia v0.6 `$HOME/.julia/v0.6/ECOS/deps/usr`).
+
+Note that the custom binaries will not be overwritten by subsequent builds of the currently installed version of ECOS.jl. However, if ECOS.jl is updated and the update includes new BinaryProvider versions of the ECOS binaries, then the custom binaries will be overwritten by the new BinaryProvider versions.
 
 ## Usage
 

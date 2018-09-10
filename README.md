@@ -14,10 +14,7 @@ You can install ECOS.jl through the Julia package manager:
 julia> Pkg.add("ECOS")
 ```
 
-ECOS.jl will automatically setup the ECOS solver itself:
- - On Linux it will build from source
- - On OS X it will download a binary via [Homebrew.jl].
- - On Windows it will download a binary.
+ECOS.jl will automatically install and setup the ECOS solver itself using [BinaryProvider.jl](https://github.com/JuliaPackaging/BinaryProvider.jl).
 
 ## Usage
 

@@ -24,15 +24,7 @@ end
     include(joinpath(MPB_test_path, "conicinterface.jl"))
     coniclineartest(ECOS.ECOSSolver(), duals=true)
     conicSOCtest(ECOS.ECOSSolver(), duals=true)
-    @static if !Compat.Sys.iswindows()
-        # Test EXP3 fails  on Windows 32 and 64 bits because the windows
-        # binaries are out of date. There failure is:
-        # Expression: (-(y[2]) * log(-(y[2]) / y[4]) + y[2]) - y[3] ≤ tol
-        # Evaluated: 0.39942722775671957 ≤ 1.0e-6
-        # See https://github.com/JuliaOpt/ECOS.jl/issues/47
-        conicEXPtest(ECOS.ECOSSolver(), duals=true)
-    end
-
+    conicEXPtest(ECOS.ECOSSolver(), duals=true)
     include(joinpath(MPB_test_path, "quadprog.jl"))
     socptest(ECOS.ECOSSolver())
 end

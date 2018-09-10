@@ -265,7 +265,7 @@ function MPB.loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones
     for (cone,idxs) in constr_cones
         cone == :Free && error("Free cone constraints not handled")
         (cone == :SOC || cone == :ExpPrimal) && continue  # Handle later
-        idxset = vec(collect(idxs))::Vector{Int}
+        idxset = vec(collect(idxs))
         if cone == :Zero
             append!(eq_rows, idxset)
             continue
@@ -331,7 +331,7 @@ function MPB.loadproblem!(m::ECOSMathProgModel, c, A, b, constr_cones, var_cones
         if cone == :SOC
             num_SOC_cones += 1
             push!(SOC_conedims, length(idxs))
-            idx_list   = collect(idxs)::Vector{Int}
+            idx_list   = collect(idxs)
             all_rows   = vcat(all_rows,   idx_list)
         end
     end

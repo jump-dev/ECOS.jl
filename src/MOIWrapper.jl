@@ -82,6 +82,7 @@ MOIU.needs_allocate_load(instance::Optimizer) = true
 
 function MOI.supports(::Optimizer,
                       ::Union{MOI.ObjectiveSense,
+                              MOI.ObjectiveFunction{MOI.SingleVariable},
                               MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}})
     return true
 end
@@ -223,13 +224,26 @@ end
 function MOIU.allocate(instance::Optimizer, ::MOI.ObjectiveSense, sense::MOI.OptimizationSense)
     instance.maxsense = sense == MOI.MaxSense
 end
-function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction, ::MOI.ScalarAffineFunction) end
+function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction,
+                       ::MOI.Union{MOI.SingleVariable,
+                                   MOI.ScalarAffineFunction{Float64}})
+end
 
-function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense) end
-function MOIU.load(instance::Optimizer, ::MOI.ObjectiveFunction, f::MOI.ScalarAffineFunction)
-    c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms), instance.data.n))
+function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense)
+end
+function MOIU.load(optimizer::Optimizer, ::MOI.ObjectiveFunction,
+                   f::MOI.SingleVariable)
+    MOIU.load(optimizer,
+              MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+              MOI.ScalarAffineFunction{Float64}(f))
+end
+function MOIU.load(instance::Optimizer, ::MOI.ObjectiveFunction,
+                   f::MOI.ScalarAffineFunction)
+    c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
+                          instance.data.n))
     instance.data.objconstant = f.constant
     instance.data.c = instance.maxsense ? -c0 : c0
+    return nothing
 end
 
 function MOI.optimize!(instance::Optimizer)

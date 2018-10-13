@@ -168,7 +168,7 @@ function MOIU.load_constraint(instance::Optimizer, ci, f::MOI.ScalarAffineFuncti
     append!(V, scalecoef(row, a.nzval, true, s))
 end
 MOIU.load_constraint(instance::Optimizer, ci, f::MOI.VectorOfVariables, s) = MOIU.load_constraint(instance, ci, MOI.VectorAffineFunction{Float64}(f), s)
-# SCS orders differently than MOI the second and third dimension of the exponential cone
+# ECOS orders differently than MOI the second and third dimension of the exponential cone
 orderval(val, s) = val
 function orderval(val, s::Union{MOI.ExponentialCone, Type{MOI.ExponentialCone}})
     val[[1, 3, 2]]

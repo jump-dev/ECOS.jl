@@ -17,7 +17,9 @@ struct Solution
     objval::Float64
     objbnd::Float64
 end
-Solution() = Solution(0, Float64[], Float64[], Float64[], Float64[], NaN, NaN)
+const OPTIMIZE_NOT_CALLED = -1
+Solution() = Solution(OPTIMIZE_NOT_CALLED, Float64[], Float64[], Float64[],
+                      Float64[], NaN, NaN)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is used to build `ECOSMatrix`
@@ -76,6 +78,7 @@ end
 function MOI.empty!(instance::Optimizer)
     instance.maxsense = false
     instance.data = nothing # It should already be nothing except if an error is thrown inside copy_to
+    instance.sol = Solution()
 end
 
 MOIU.needs_allocate_load(instance::Optimizer) = true
@@ -285,19 +288,25 @@ end
 # Implements getter for result value and statuses
 function MOI.get(instance::Optimizer, ::MOI.TerminationStatus)
     flag = instance.sol.ret_val
-    if flag == ECOS.ECOS_OPTIMAL
-        MOI.Success
+    if flag == OPTIMIZE_NOT_CALLED
+        return MOI.OptimizeNotCalled
+    elseif flag == ECOS.ECOS_OPTIMAL
+        return MOI.Optimal
     elseif flag == ECOS.ECOS_PINF
-        MOI.Success
-    elseif flag == ECOS.ECOS_DINF  # Dual infeasible = primal unbounded, probably
-        MOI.Success
+        return MOI.Infeasible
+    elseif flag == ECOS.ECOS_DINF
+        return MOI.DualInfeasible
     elseif flag == ECOS.ECOS_MAXIT
-        MOI.IterationLimit
+        return MOI.IterationLimit
     elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
-        m.solve_stat = MOI.AlmostSuccess
+        return MOI.AlmostOptimal
+    elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
+        return MOI.AlmostInfeasible
     else
-        m.solve_stat = MOI.OtherError
+        return MOI.OtherError
     end
+    # TODO: AlmostDualInfeasible for ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
+    # https://github.com/JuliaOpt/MathOptInterface.jl/issues/601
 end
 
 MOI.get(instance::Optimizer, ::MOI.ObjectiveValue) = instance.sol.objval
@@ -306,17 +315,21 @@ MOI.get(instance::Optimizer, ::MOI.ObjectiveBound) = instance.sol.objbnd
 function MOI.get(instance::Optimizer, ::MOI.PrimalStatus)
     flag = instance.sol.ret_val
     if flag == ECOS.ECOS_OPTIMAL
-        MOI.FeasiblePoint
+        return MOI.FeasiblePoint
     elseif flag == ECOS.ECOS_PINF
-        MOI.InfeasiblePoint
-    elseif flag == ECOS.ECOS_DINF  # Dual infeasible = primal unbounded, probably
-        MOI.InfeasibilityCertificate
+        return MOI.InfeasiblePoint
+    elseif flag == ECOS.ECOS_DINF
+        return MOI.InfeasibilityCertificate
     elseif flag == ECOS.ECOS_MAXIT
-        MOI.UnknownResultStatus
+        return MOI.UnknownResultStatus
     elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
-        m.solve_stat = MOI.NearlyFeasiblePoint
+        return MOI.NearlyFeasiblePoint
+    elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
+        return MOI.InfeasiblePoint
+    elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
+        return MOI.NearlyInfeasibilityCertificate
     else
-        m.solve_stat = MOI.OtherResultStatus
+        return MOI.OtherResultStatus
     end
 end
 # Swapping indices 2 <-> 3 is an involution (it is its own inverse)
@@ -347,15 +360,19 @@ end
 function MOI.get(instance::Optimizer, ::MOI.DualStatus)
     flag = instance.sol.ret_val
     if flag == ECOS.ECOS_OPTIMAL
-        MOI.FeasiblePoint
+        return MOI.FeasiblePoint
     elseif flag == ECOS.ECOS_PINF
-        MOI.InfeasibilityCertificate
-    elseif flag == ECOS.ECOS_DINF  # Dual infeasible = primal unbounded, probably
-        MOI.InfeasiblePoint
+        return MOI.InfeasibilityCertificate
+    elseif flag == ECOS.ECOS_DINF
+        return MOI.InfeasiblePoint
     elseif flag == ECOS.ECOS_MAXIT
-        MOI.UnknownResultStatus
+        return MOI.UnknownResultStatus
     elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
-        m.solve_stat = MOI.NearlyFeasiblePoint
+        return MOI.NearlyFeasiblePoint
+    elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
+        return MOI.NearlyInfeasibilityCertificate
+    elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
+        return MOI.InfeasiblePoint
     else
         m.solve_stat = MOI.OtherResultStatus
     end

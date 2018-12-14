@@ -2,3 +2,4 @@ deps.jl
 downloads/
 src/
 usr/
+build.log

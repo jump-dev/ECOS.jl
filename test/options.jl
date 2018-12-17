@@ -10,7 +10,7 @@
 import ECOS
 using Compat.Test
 
-println(ECOS.ver())
+println(ECOS.ECOS_VERSION)
 
 n = 223
 m = 220

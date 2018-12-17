@@ -140,7 +140,7 @@ struct Csettings
     centrality::Cdouble
 end
 
-if VersionNumber(ver()) >= v"2.0.5"
+if ECOS_VERSION >= v"2.0.5"
     @eval struct Cpwork
         # Dimensions
         n::Clong

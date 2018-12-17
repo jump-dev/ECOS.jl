@@ -15,17 +15,17 @@ using Compat.SparseArrays
 using Compat.LinearAlgebra
 
 # Try to load the binary dependency
-if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
+if isfile(joinpath(dirname(@__DIR__), "deps", "deps.jl"))
     include("../deps/deps.jl")
 else
     error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")
 end
 
-# ver  [not exported]
-# Returns the version of ECOS in use
-function ver()
-    ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{UInt8}, ())
-    return unsafe_string(ver_ptr)
+const ECOS_VERSION = let
+    ver_ptr = ccall((:ECOS_ver, ecos), Ptr{UInt8}, ())
+    @assert ver_ptr != C_NULL  # sanity check; verified by check_deps() in __init__
+    ver_str = unsafe_string(ver_ptr)
+    VersionNumber(ver_str)
 end
 
 macro ecos_ccall(func, args...)
@@ -39,10 +39,12 @@ macro ecos_ccall(func, args...)
 end
 
 function __init__()
-    vnum = VersionNumber(ver())
-    if !(vnum.major == 2 && vnum.minor == 0)
-        depsdir = realpath(joinpath(dirname(@__FILE__),"..","deps"))
-        error("Current ECOS version installed is $(ver()), but we require version 2.0.*. On Linux and Windows, delete the contents of the `$depsdir` directory except for the files `build.jl` and `.gitignore`, then rerun Pkg.build(\"ECOS\"). On OS X, run `using Homebrew; Homebrew.update()` in Julia.")
+    check_deps()
+    if !(ECOS_VERSION.major == 2 && ECOS_VERSION.minor == 0)
+        depsdir = realpath(joinpath(dirname(@__DIR__), "deps"))
+        error("Current ECOS version installed is $ECOS_VERSION, but we require version " *
+              "2.0.*. Delete the contents of the `$depsdir` directory except for the " *
+              "files `build.jl` and `.gitignore`, then rerun Pkg.build(\"ECOS\").")
     end
 end
 

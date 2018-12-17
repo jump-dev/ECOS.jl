@@ -14,7 +14,7 @@ using Compat.SparseArrays
 # The values below are copied from data.h in ECOS source code
 import ECOS
 
-println(ECOS.ver())
+println(ECOS.ECOS_VERSION)
 
 function test1()
     n = 223

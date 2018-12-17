@@ -36,3 +36,12 @@ end
     MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(optimizer)),
                        config, exclude)
 end
+
+@testset "SolverName" begin
+    @test MOI.get(optimizer, MOI.SolverName()) == "ECOS"
+end
+
+@testset "supports_allocate_load" begin
+    @test MOIU.supports_allocate_load(optimizer.optimizer, false)
+    @test !MOIU.supports_allocate_load(optimizer.optimizer, true)
+end

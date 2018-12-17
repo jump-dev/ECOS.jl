@@ -71,6 +71,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     end
 end
 
+MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
+
 function MOI.is_empty(instance::Optimizer)
     !instance.maxsense && instance.data === nothing
 end

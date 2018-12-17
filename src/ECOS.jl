@@ -152,7 +152,7 @@ function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
     ccall((:ECOS_cleanup, ECOS.ecos), Cvoid, (Ptr{Cpwork}, Clong), problem, keepvars)
 end
 
-include("MPBWrapper.jl")
-include("MOIWrapper.jl")
+include("MPB_wrapper.jl")
+include("MOI_wrapper.jl")
 
 end # module

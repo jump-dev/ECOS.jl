@@ -8,7 +8,7 @@
 #############################################################################
 
 @testset "Test the MPB wrapper with linprog" begin
-    include("mpb_linear.jl")
+    include("MPB_linear.jl")
 end
 
 import ECOS

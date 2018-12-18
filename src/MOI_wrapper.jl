@@ -227,7 +227,7 @@ function MOIU.load_variables(instance::Optimizer, nvars::Integer)
 end
 
 function MOIU.allocate(instance::Optimizer, ::MOI.ObjectiveSense, sense::MOI.OptimizationSense)
-    instance.maxsense = sense == MOI.MaxSense
+    instance.maxsense = sense == MOI.MAX_SENSE
 end
 function MOIU.allocate(::Optimizer, ::MOI.ObjectiveFunction,
                        ::MOI.Union{MOI.SingleVariable,
@@ -291,24 +291,24 @@ end
 function MOI.get(instance::Optimizer, ::MOI.TerminationStatus)
     flag = instance.sol.ret_val
     if flag == OPTIMIZE_NOT_CALLED
-        return MOI.OptimizeNotCalled
+        return MOI.OPTIMIZE_NOT_CALLED
     elseif flag == ECOS.ECOS_OPTIMAL
-        return MOI.Optimal
+        return MOI.OPTIMAL
     elseif flag == ECOS.ECOS_PINF
-        return MOI.Infeasible
+        return MOI.INFEASIBLE
     elseif flag == ECOS.ECOS_DINF
-        return MOI.DualInfeasible
+        return MOI.DUAL_INFEASIBLE
     elseif flag == ECOS.ECOS_MAXIT
         return MOI.IterationLimit
     elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
-        return MOI.AlmostOptimal
+        return MOI.ALMOST_OPTIMAL
     elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
-        return MOI.AlmostInfeasible
+        return MOI.ALMOST_INFEASIBLE
+    elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
+        return MOI.ALMOST_DUAL_INFEASIBLE
     else
-        return MOI.OtherError
+        return MOI.OTHER_ERROR
     end
-    # TODO: AlmostDualInfeasible for ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
-    # https://github.com/JuliaOpt/MathOptInterface.jl/issues/601
 end
 
 MOI.get(instance::Optimizer, ::MOI.ObjectiveValue) = instance.sol.objval
@@ -317,21 +317,21 @@ MOI.get(instance::Optimizer, ::MOI.ObjectiveBound) = instance.sol.objbnd
 function MOI.get(instance::Optimizer, ::MOI.PrimalStatus)
     flag = instance.sol.ret_val
     if flag == ECOS.ECOS_OPTIMAL
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     elseif flag == ECOS.ECOS_PINF
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     elseif flag == ECOS.ECOS_DINF
-        return MOI.InfeasibilityCertificate
+        return MOI.INFEASIBILITY_CERTIFICATE
     elseif flag == ECOS.ECOS_MAXIT
-        return MOI.UnknownResultStatus
+        return MOI.UNKNOWN_RESULT_STATUS
     elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
-        return MOI.NearlyFeasiblePoint
+        return MOI.NEARLY_FEASIBLE_POINT
     elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
-        return MOI.NearlyInfeasibilityCertificate
+        return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
     else
-        return MOI.OtherResultStatus
+        return MOI.OTHER_RESULT_STATUS
     end
 end
 # Swapping indices 2 <-> 3 is an involution (it is its own inverse)
@@ -362,21 +362,21 @@ end
 function MOI.get(instance::Optimizer, ::MOI.DualStatus)
     flag = instance.sol.ret_val
     if flag == ECOS.ECOS_OPTIMAL
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     elseif flag == ECOS.ECOS_PINF
-        return MOI.InfeasibilityCertificate
+        return MOI.INFEASIBILITY_CERTIFICATE
     elseif flag == ECOS.ECOS_DINF
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     elseif flag == ECOS.ECOS_MAXIT
-        return MOI.UnknownResultStatus
+        return MOI.UNKNOWN_RESULT_STATUS
     elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
-        return MOI.NearlyFeasiblePoint
+        return MOI.NEARLY_FEASIBLE_POINT
     elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
-        return MOI.NearlyInfeasibilityCertificate
+        return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
     elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
-        return MOI.InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
     else
-        m.solve_stat = MOI.OtherResultStatus
+        return MOI.OTHER_RESULT_STATUS
     end
 end
 _dual(instance, ci::CI{<:MOI.AbstractFunction, <:ZeroCones}) = instance.sol.dual_eq

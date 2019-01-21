@@ -5,13 +5,11 @@ const MOIB = MOI.Bridges
 
 const MOIU = MOI.Utilities
 MOIU.@model(ECOSModelData,
-            (),
-            (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan),
+            (), (), # No scalar functions
             (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone,
              MOI.ExponentialCone),
             (),
-            (MOI.SingleVariable,),
-            (MOI.ScalarAffineFunction,),
+            (), (), # No scalar sets
             (MOI.VectorOfVariables,),
             (MOI.VectorAffineFunction,))
 const optimizer = MOIU.CachingOptimizer(ECOSModelData{Float64}(), ECOS.Optimizer(verbose=false))
@@ -20,7 +18,8 @@ const optimizer = MOIU.CachingOptimizer(ECOSModelData{Float64}(), ECOS.Optimizer
 const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
 @testset "Unit" begin
-    MOIT.unittest(MOIB.SplitInterval{Float64}(optimizer), config,
+    MOIT.unittest(MOIB.SplitInterval{Float64}(MOIB.Vectorize{Float64}(optimizer)),
+                  config,
                   [# Quadratic functions are not supported
                    "solve_qcp_edge_cases", "solve_qp_edge_cases",
                    # Integer and ZeroOne sets are not supported
@@ -28,12 +27,13 @@ const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 end
 
 @testset "Continuous linear problems" begin
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(optimizer), config)
+    MOIT.contlineartest(MOIB.SplitInterval{Float64}(MOIB.Vectorize{Float64}(optimizer)),
+                        config)
 end
 
 @testset "Continuous conic problems" begin
     exclude = ["sdp", "rootdet", "logdet"]
-    MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(optimizer)),
+    MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(MOIB.Vectorize{Float64}(optimizer))),
                        config, exclude)
 end
 

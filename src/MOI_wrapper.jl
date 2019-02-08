@@ -6,8 +6,8 @@ const VI = MOI.VariableIndex
 const MOIU = MOI.Utilities
 
 const SF = Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
-const SS = Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-                 MOI.SecondOrderCone, MOI.ExponentialCone}
+const SS = Union{MOI.Zeros, MOI.Nonnegatives, MOI.SecondOrderCone,
+                 MOI.ExponentialCone}
 
 struct Solution
     ret_val::Int
@@ -97,8 +97,6 @@ end
 
 using Compat.SparseArrays
 
-const LPCones = Union{MOI.Nonnegatives, MOI.Nonpositives}
-
 # Computes cone dimensions
 constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, MOI.Zeros}) = ci.value
 function _allocate_constraint(cone::ConeData, f, s::MOI.Zeros)
@@ -106,8 +104,8 @@ function _allocate_constraint(cone::ConeData, f, s::MOI.Zeros)
     cone.f += MOI.dimension(s)
     ci
 end
-constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, <:LPCones}) = ci.value
-function _allocate_constraint(cone::ConeData, f, s::LPCones)
+constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, MOI.Nonnegatives}) = ci.value
+function _allocate_constraint(cone::ConeData, f, s::MOI.Nonnegatives)
     ci = cone.l
     cone.l += MOI.dimension(s)
     ci
@@ -131,8 +129,6 @@ function MOIU.allocate_constraint(instance::Optimizer, f::F, s::S) where {F <: M
 end
 
 # Build constraint matrix
-scalecoef(rows, coef, minus, s) = minus ? -coef : coef
-scalecoef(rows, coef, minus, s::Union{MOI.Nonpositives, Type{MOI.Nonpositives}}) = minus ? coef : -coef
 output_index(t::MOI.VectorAffineTerm) = t.output_index
 variable_index_value(t::MOI.ScalarAffineTerm) = t.variable_index.value
 variable_index_value(t::MOI.VectorAffineTerm) = variable_index_value(t.scalar_term)
@@ -142,7 +138,7 @@ constrrows(s::MOI.AbstractVectorSet) = 1:MOI.dimension(s)
 constrrows(instance::Optimizer, ci::CI{<:MOI.AbstractVectorFunction, MOI.Zeros}) = 1:instance.cone.eqnrows[constroffset(instance, ci)]
 constrrows(instance::Optimizer, ci::CI{<:MOI.AbstractVectorFunction, <:MOI.AbstractVectorSet}) = 1:instance.cone.ineqnrows[constroffset(instance, ci)]
 matrix(data::ModelData, s::MOI.Zeros) = data.b, data.IA, data.JA, data.VA
-matrix(data::ModelData, s::Union{LPCones, MOI.SecondOrderCone, MOI.ExponentialCone}) = data.h, data.IG, data.JG, data.VG
+matrix(data::ModelData, s::Union{MOI.Nonnegatives, MOI.SecondOrderCone, MOI.ExponentialCone}) = data.h, data.IG, data.JG, data.VG
 matrix(instance::Optimizer, s) = matrix(instance.data, s)
 MOIU.load_constraint(instance::Optimizer, ci, f::MOI.VectorOfVariables, s) = MOIU.load_constraint(instance, ci, MOI.VectorAffineFunction{Float64}(f), s)
 # ECOS orders differently than MOI the second and third dimension of the exponential cone
@@ -171,10 +167,10 @@ function MOIU.load_constraint(instance::Optimizer, ci, f::MOI.VectorAffineFuncti
     # The ECOS format is b - Ax ∈ cone
     # so minus=false for b and minus=true for A
     b, Is, Js, Vs = matrix(instance, s)
-    b[i] .= scalecoef(rows, orderval(f.constants, s), false, s)
+    b[i] .= orderval(f.constants, s)
     append!(Is, offset .+ orderidx(I, s))
     append!(Js, J)
-    append!(Vs, scalecoef(I, V, true, s))
+    append!(Vs, -V)
 end
 
 function MOIU.allocate_variables(instance::Optimizer, nvars::Integer)
@@ -318,7 +314,7 @@ end
 function MOI.get(instance::Optimizer, ::MOI.ConstraintPrimal, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
     offset = constroffset(instance, ci)
     rows = constrrows(instance, ci)
-    return scalecoef(rows, reorderval(instance.sol.slack[offset .+ rows], S), false, S)
+    return reorderval(instance.sol.slack[offset .+ rows], S)
 end
 
 function MOI.get(instance::Optimizer, ::MOI.DualStatus)
@@ -346,7 +342,7 @@ _dual(instance, ci::CI) = instance.sol.dual_ineq
 function MOI.get(instance::Optimizer, ::MOI.ConstraintDual, ci::CI{<:MOI.AbstractFunction, S}) where S <: MOI.AbstractSet
     offset = constroffset(instance, ci)
     rows = constrrows(instance, ci)
-    scalecoef(rows, reorderval(_dual(instance, ci)[offset .+ rows], S), false, S)
+    return reorderval(_dual(instance, ci)[offset .+ rows], S)
 end
 
 MOI.get(instance::Optimizer, ::MOI.ResultCount) = 1

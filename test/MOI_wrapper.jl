@@ -25,34 +25,35 @@ MOIU.@model(ECOSModelData,
              MOI.ExponentialCone),
             (),
             (), (), # No scalar sets
-            (MOI.VectorOfVariables,),
-            (MOI.VectorAffineFunction,))
+            (), (MOI.VectorAffineFunction,))
 # UniversalFallback is needed for starting values, even if they are ignored by ECOS
 const cache = MOIU.UniversalFallback(ECOSModelData{Float64}())
 const cached = MOIU.CachingOptimizer(cache, optimizer)
 
 # Essential bridges that are needed for all tests
-const bridged = MOIB.Vectorize{Float64}(MOIB.NonposToNonneg{Float64}(cached))
+const bridged = MOIB.full_bridge_optimizer(cached, Float64)
 
 # SOC2 requires 1e-4
 const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 
 @testset "Unit" begin
-    MOIT.unittest(MOIB.SplitInterval{Float64}(bridged),
+    MOIT.unittest(bridged,
                   config,
-                  [# Quadratic functions are not supported
-                   "solve_qcp_edge_cases", "solve_qp_edge_cases",
+                  [# Need https://github.com/JuliaOpt/MathOptInterface.jl/issues/529
+                   "solve_qp_edge_cases",
                    # Integer and ZeroOne sets are not supported
                    "solve_integer_edge_cases", "solve_objbound_edge_cases"])
 end
 
 @testset "Continuous linear problems" begin
-    MOIT.contlineartest(MOIB.SplitInterval{Float64}(bridged),
-                        config)
+    MOIT.contlineartest(bridged, config)
+end
+
+@testset "Continuous quadratic problems" begin
+    MOIT.qcptest(bridged, config)
 end
 
 @testset "Continuous conic problems" begin
     exclude = ["sdp", "rootdet", "logdet"]
-    MOIT.contconictest(MOIB.GeoMean{Float64}(MOIB.RSOC{Float64}(bridged)),
-                       config, exclude)
+    MOIT.contconictest(bridged, config, exclude)
 end

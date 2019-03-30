@@ -5,10 +5,6 @@ const VI = MOI.VariableIndex
 
 const MOIU = MOI.Utilities
 
-const SF = Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{Float64}}
-const SS = Union{MOI.Zeros, MOI.Nonnegatives, MOI.SecondOrderCone,
-                 MOI.ExponentialCone}
-
 struct Solution
     ret_val::Int
     primal::Vector{Float64}
@@ -89,7 +85,13 @@ function MOI.supports(::Optimizer,
     return true
 end
 
-MOI.supports_constraint(::Optimizer, ::Type{<:SF}, ::Type{<:SS}) = true
+function MOI.supports_constraint(::Optimizer,
+                                 ::Type{MOI.VectorAffineFunction{Float64}},
+                                 ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives,
+                                                MOI.SecondOrderCone,
+                                                MOI.ExponentialCone}})
+    return true
+end
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
     return MOIU.automatic_copy_to(dest, src; kws...)
@@ -140,7 +142,6 @@ constrrows(instance::Optimizer, ci::CI{<:MOI.AbstractVectorFunction, <:MOI.Abstr
 matrix(data::ModelData, s::MOI.Zeros) = data.b, data.IA, data.JA, data.VA
 matrix(data::ModelData, s::Union{MOI.Nonnegatives, MOI.SecondOrderCone, MOI.ExponentialCone}) = data.h, data.IG, data.JG, data.VG
 matrix(instance::Optimizer, s) = matrix(instance.data, s)
-MOIU.load_constraint(instance::Optimizer, ci, f::MOI.VectorOfVariables, s) = MOIU.load_constraint(instance, ci, MOI.VectorAffineFunction{Float64}(f), s)
 # ECOS orders differently than MOI the second and third dimension of the exponential cone
 orderval(val, s) = val
 function orderval(val, s::Union{MOI.ExponentialCone, Type{MOI.ExponentialCone}})

@@ -11,12 +11,13 @@ struct Solution
     dual_eq::Vector{Float64}
     dual_ineq::Vector{Float64}
     slack::Vector{Float64}
-    objval::Float64
-    objbnd::Float64
+    objective_value::Float64
+    dual_objective_value::Float64
+    solve_time::Float64
 end
 const OPTIMIZE_NOT_CALLED = -1
 Solution() = Solution(OPTIMIZE_NOT_CALLED, Float64[], Float64[], Float64[],
-                      Float64[], NaN, NaN)
+                      Float64[], NaN, NaN, NaN)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is used to build `ECOSMatrix`
@@ -58,13 +59,31 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     maxsense::Bool
     data::Union{Nothing, ModelData} # only non-Nothing between MOI.copy_to and MOI.optimize!
     sol::Solution
-    options
+    silent::Bool
+    options::Dict{Symbol, Any}
     function Optimizer(; kwargs...)
-        new(ConeData(), false, nothing, Solution(), kwargs)
+        optimizer = new(ConeData(), false, nothing, Solution(), false, Dict{Symbol, Any}())
+        for (key, value) in kwargs
+            MOI.set(optimizer, MOI.RawParameter(key), value)
+        end
+        return optimizer
     end
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
+
+function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+    optimizer.options[param.name] = value
+end
+function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    return optimizer.options[param.name]
+end
+
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+function MOI.set(optimizer::Optimizer, ::MOI.Silent, value::Bool)
+    optimizer.silent = value
+end
+MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
 function MOI.is_empty(instance::Optimizer)
     !instance.maxsense && instance.data === nothing
@@ -97,7 +116,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
     return MOIU.automatic_copy_to(dest, src; kws...)
 end
 
-using Compat.SparseArrays
+using SparseArrays
 
 # Computes cone dimensions
 constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, MOI.Zeros}) = ci.value
@@ -234,25 +253,60 @@ function MOI.optimize!(instance::Optimizer)
     objconstant = instance.data.objconstant
     c = instance.data.c
     instance.data = nothing # Allows GC to free instance.data before A is loaded to ECOS
+    options = instance.options
+    if instance.silent
+        options = copy(options)
+        options[:verbose] = false
+    end
     ecos_prob_ptr = ECOS.setup(n, m, cone.f, cone.l, length(cone.qa), cone.qa,
-                               cone.ep, G, A, c, h, b; instance.options...)
+                               cone.ep, G, A, c, h, b; options...)
+    start_time = time()
     ret_val = ECOS.solve(ecos_prob_ptr)
+    solve_time = time() - start_time
     ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
     primal    = unsafe_wrap(Array, ecos_prob.x, n)[:]
     dual_eq   = unsafe_wrap(Array, ecos_prob.y, cone.f)[:]
     dual_ineq = unsafe_wrap(Array, ecos_prob.z, m)[:]
     slack     = unsafe_wrap(Array, ecos_prob.s, m)[:]
     ECOS.cleanup(ecos_prob_ptr, 0)
-    objval = (instance.maxsense ? -1 : 1) * dot(c, primal)
+    objective_value = (instance.maxsense ? -1 : 1) * dot(c, primal)
     if ret_val != ECOS.ECOS_DINF
-        objval += objconstant
+        objective_value += objconstant
     end
-    objbnd = -(dot(b, dual_eq) + dot(h, dual_ineq))
+    dual_objective_value = (instance.maxsense ? 1 : -1) * (dot(b, dual_eq) + dot(h, dual_ineq))
     if ret_val != ECOS.ECOS_PINF
-        objbnd += objconstant
+        dual_objective_value += objconstant
     end
-    instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objval,
-                            objbnd)
+    instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objective_value,
+                            dual_objective_value, solve_time)
+end
+
+MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.solve_time
+function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
+    # Strings from https://github.com/ifa-ethz/ecos/blob/master/include/ecos.h
+    flag = optimizer.sol.ret_val
+    if flag == OPTIMIZE_NOT_CALLED
+        return "Optimize not called"
+    elseif flag == ECOS_OPTIMAL
+        return "Problem solved to optimality"
+    elseif flag == ECOS_PINF
+        return "Found certificate of primal infeasibility"
+    elseif flag == ECOS_DINF
+        return "Found certificate of dual infeasibility"
+    elseif flag == ECOS_INACC_OFFSET
+        return "Offset exitflag at inaccurate results"
+    elseif flag == ECOS_MAXIT
+        return "Maximum number of iterations reached"
+    elseif flag == ECOS_NUMERICS
+        return "Search direction unreliable"
+    elseif flag == ECOS_OUTCONE
+        return "s or z got outside the cone, numerics?"
+    elseif flag == ECOS_SIGINT
+        return "solver interrupted by a signal/ctrl-c"
+    else
+        @assert flag == ECOS_FATAL
+        return "Unknown problem in solver"
+    end
 end
 
 # Implements getter for result value and statuses
@@ -279,8 +333,8 @@ function MOI.get(instance::Optimizer, ::MOI.TerminationStatus)
     end
 end
 
-MOI.get(instance::Optimizer, ::MOI.ObjectiveValue) = instance.sol.objval
-MOI.get(instance::Optimizer, ::MOI.ObjectiveBound) = instance.sol.objbnd
+MOI.get(instance::Optimizer, ::MOI.ObjectiveValue) = instance.sol.objective_value
+MOI.get(instance::Optimizer, ::MOI.DualObjectiveValue) = instance.sol.dual_objective_value
 
 function MOI.get(instance::Optimizer, ::MOI.PrimalStatus)
     flag = instance.sol.ret_val

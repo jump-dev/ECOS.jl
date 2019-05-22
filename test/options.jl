@@ -8,7 +8,7 @@
 #############################################################################
 
 import ECOS
-using Compat.Test
+using Test
 
 println(ECOS.ver())
 

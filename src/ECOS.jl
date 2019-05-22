@@ -7,12 +7,10 @@
 # Contains the wrapper itself
 #############################################################################
 
-__precompile__()
 module ECOS
 
-using Compat
-using Compat.SparseArrays
-using Compat.LinearAlgebra
+using SparseArrays
+using LinearAlgebra
 
 # Try to load the binary dependency
 if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))

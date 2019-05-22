@@ -1,5 +1,4 @@
-using Compat
-using Compat.Test
+using Test
 
 using MathOptInterface
 const MOI = MathOptInterface
@@ -8,7 +7,8 @@ const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
 import ECOS
-const optimizer = ECOS.Optimizer(verbose=false)
+const optimizer = ECOS.Optimizer()
+MOI.set(optimizer, MOI.Silent(), true)
 
 @testset "SolverName" begin
     @test MOI.get(optimizer, MOI.SolverName()) == "ECOS"

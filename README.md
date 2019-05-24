@@ -50,7 +50,7 @@ To use these settings you can either pass them as keyword arguments to `setup` (
 # Direct
 my_prob = ECOS.setup(n, m, ..., c, h, b; maxit=10, feastol=1e-5)
 # MathProgBase (with JuMP)
-m = Model(solver=ECOS.ECOSSolver(maxit=10, feastol=1e-5))
+model = Model(with_optimizer(ECOS.Optimizer, maxit=10, feastol=1e-5))
 ```
 
 ### JuMP example
@@ -65,11 +65,11 @@ items  = [:Gold, :Silver, :Bronze]
 values = Dict(:Gold => 5.0,  :Silver => 3.0,  :Bronze => 1.0)
 weight = Dict(:Gold => 2.0,  :Silver => 1.5,  :Bronze => 0.3)
 
-m = Model(solver=ECOSSolver())
-@variable(m, 0 <= take[items] <= 1)  # Define a variable for each item
-@objective(m, Max, sum(values[item] * take[item] for item in items))
-@constraint(m, sum(weight[item] * take[item] for item in items) <= 3)
-solve(m)
+model = Model(with_optimizer(ECOS.Optimizer))
+@variable(model, 0 <= take[items] <= 1)  # Define a variable for each item
+@objective(model, Max, sum(values[item] * take[item] for item in items))
+@constraint(model, sum(weight[item] * take[item] for item in items) <= 3)
+solve(model)
 
 println(getvalue(take))
 # take

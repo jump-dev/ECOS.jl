@@ -1,9 +1,9 @@
 # ECOS.jl
 
-| **PackageEvaluator** | **Build Status** |
-|:--------------------:|:----------------:|
-| [![][pkg-0.5-img]][pkg-0.5-url] | [![Build Status][build-img]][build-url] [![Build Status][winbuild-img]][winbuild-url] |
-| [![][pkg-0.6-img]][pkg-0.6-url] | [![Coveralls branch][coveralls-img]][coveralls-url] [![Codecov branch][codecov-img]][codecov-url] |
+| **Build Status** |
+|:----------------:|
+| [![Build Status][build-img]][build-url] [![Build Status][winbuild-img]][winbuild-url] |
+| [![Coveralls branch][coveralls-img]][coveralls-url] [![Codecov branch][codecov-img]][codecov-url] |
 
 Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable conic optimization interior point solver.
 
@@ -26,10 +26,10 @@ Note that the custom binaries will not be overwritten by subsequent builds of th
 
 The ECOS interface is completely wrapped. ECOS functions corresponding to the C API are available as `ECOS.setup`, `ECOS.solve`, `ECOS.cleanup`, and `ECOS.ver` (these are not exported from the module). Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.
 
-ECOS.jl also supports the [JuliaOpt] **[MathProgBase]** standard solver interface.
+ECOS.jl also supports the **[MathOptInterface](https://github.com/JuliaOpt/MathOptInterface.jl)** standard solver interface.
 Thanks to this support ECOS can be used as a solver with both the **[JuMP]** and **[Convex.jl]** modeling languages.
 
-All ECOS solver options can be set through the direct interface and through MathProgBase.
+All ECOS solver options can be set through the direct interface and through MathOptInterface.
 The list of options is defined the [`ecos.h` header](https://github.com/embotech/ecos/blob/master/include/ecos.h), which we reproduce here:
 ```julia
 gamma          # scaling the final step length
@@ -45,11 +45,13 @@ nitref         # number of iterative refinement steps
 maxit          # maximum number of iterations
 verbose        # verbosity bool for PRINTLEVEL < 3
 ```
-To use these settings you can either pass them as keyword arguments to `setup` (direct interface) or as arguments to the `ECOSSolver` constructor (MathProgBase interface), e.g.
+To use these settings you can either pass them as keyword arguments to `setup`
+(direct interface) or as arguments to the `ECOS.Optimizer` constructor
+(MathOptInterface interface), e.g.
 ```julia
 # Direct
 my_prob = ECOS.setup(n, m, ..., c, h, b; maxit=10, feastol=1e-5)
-# MathProgBase (with JuMP)
+# MathOptInterface (with JuMP)
 model = Model(with_optimizer(ECOS.Optimizer, maxit=10, feastol=1e-5))
 ```
 
@@ -69,9 +71,9 @@ model = Model(with_optimizer(ECOS.Optimizer))
 @variable(model, 0 <= take[items] <= 1)  # Define a variable for each item
 @objective(model, Max, sum(values[item] * take[item] for item in items))
 @constraint(model, sum(weight[item] * take[item] for item in items) <= 3)
-solve(model)
+optimize!(model)
 
-println(getvalue(take))
+println(value(take))
 # take
 # [  Gold] = 0.9999999680446406
 # [Silver] = 0.46666670881026834
@@ -87,11 +89,6 @@ println(getvalue(take))
 [Convex.jl]: https://github.com/JuliaOpt/Convex.jl
 [Homebrew.jl]: https://github.com/JuliaLang/Homebrew.jl
 [JuliaOpt]: http://juliaopt.org
-
-[pkg-0.5-img]: http://pkg.julialang.org/badges/ECOS_0.5.svg
-[pkg-0.5-url]: http://pkg.julialang.org/?pkg=ECOS
-[pkg-0.6-img]: http://pkg.julialang.org/badges/ECOS_0.6.svg
-[pkg-0.6-url]: http://pkg.julialang.org/?pkg=ECOS
 
 [build-img]: https://travis-ci.org/JuliaOpt/ECOS.jl.svg?branch=master
 [build-url]: https://travis-ci.org/JuliaOpt/ECOS.jl

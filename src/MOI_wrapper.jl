@@ -284,12 +284,16 @@ function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
         return "Optimize not called"
     elseif flag == ECOS_OPTIMAL
         return "Problem solved to optimality"
+    elseif flag == ECOS_OPTIMAL + ECOS_INACC_OFFSET
+        return "Problem solved to inaccurate optimality"
     elseif flag == ECOS_PINF
         return "Found certificate of primal infeasibility"
+    elseif flag == ECOS_PINF + ECOS_INACC_OFFSET
+        return "Found inaccurate certificate of primal infeasibility"
     elseif flag == ECOS_DINF
         return "Found certificate of dual infeasibility"
-    elseif flag == ECOS_INACC_OFFSET
-        return "Offset exitflag at inaccurate results"
+    elseif flag == ECOS_DINF + ECOS_INACC_OFFSET
+        return "Found inaccurate certificate of dual infeasibility"
     elseif flag == ECOS_MAXIT
         return "Maximum number of iterations reached"
     elseif flag == ECOS_NUMERICS

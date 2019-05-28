@@ -13,11 +13,12 @@ struct Solution
     slack::Vector{Float64}
     objective_value::Float64
     dual_objective_value::Float64
+    objective_constant::Float64
     solve_time::Float64
 end
 const OPTIMIZE_NOT_CALLED = -1
 Solution() = Solution(OPTIMIZE_NOT_CALLED, Float64[], Float64[], Float64[],
-                      Float64[], NaN, NaN, NaN)
+                      Float64[], NaN, NaN, NaN, NaN)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is used to build `ECOSMatrix`
@@ -33,7 +34,7 @@ mutable struct ModelData
     JG::Vector{Int} # List of equality cols
     VG::Vector{Float64} # List of equality coefficients
     h::Vector{Float64} # List of equality coefficients
-    objconstant::Float64 # The objective is min c'x + objconstant
+    objective_constant::Float64 # The objective is min c'x + objective_constant
     c::Vector{Float64}
 end
 
@@ -233,7 +234,7 @@ function MOIU.load(instance::Optimizer, ::MOI.ObjectiveFunction,
                    f::MOI.ScalarAffineFunction)
     c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
                           instance.data.n))
-    instance.data.objconstant = f.constant
+    instance.data.objective_constant = f.constant
     instance.data.c = instance.maxsense ? -c0 : c0
     return nothing
 end
@@ -250,7 +251,7 @@ function MOI.optimize!(instance::Optimizer)
     b = instance.data.b
     G = ECOS.ECOSMatrix(sparse(instance.data.IG, instance.data.JG, instance.data.VG, m, n))
     h = instance.data.h
-    objconstant = instance.data.objconstant
+    objective_constant = instance.data.objective_constant
     c = instance.data.c
     instance.data = nothing # Allows GC to free instance.data before A is loaded to ECOS
     options = instance.options
@@ -270,15 +271,9 @@ function MOI.optimize!(instance::Optimizer)
     slack     = unsafe_wrap(Array, ecos_prob.s, m)[:]
     ECOS.cleanup(ecos_prob_ptr, 0)
     objective_value = (instance.maxsense ? -1 : 1) * dot(c, primal)
-    if ret_val != ECOS.ECOS_DINF
-        objective_value += objconstant
-    end
     dual_objective_value = (instance.maxsense ? 1 : -1) * (dot(b, dual_eq) + dot(h, dual_ineq))
-    if ret_val != ECOS.ECOS_PINF
-        dual_objective_value += objconstant
-    end
     instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objective_value,
-                            dual_objective_value, solve_time)
+                            dual_objective_value, objective_constant, solve_time)
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.solve_time
@@ -333,8 +328,20 @@ function MOI.get(instance::Optimizer, ::MOI.TerminationStatus)
     end
 end
 
-MOI.get(instance::Optimizer, ::MOI.ObjectiveValue) = instance.sol.objective_value
-MOI.get(instance::Optimizer, ::MOI.DualObjectiveValue) = instance.sol.dual_objective_value
+function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
+    value = optimizer.sol.objective_value
+    if !MOIU.is_ray(MOI.get(optimizer, MOI.PrimalStatus()))
+        value += optimizer.sol.objective_constant
+    end
+    return value
+end
+function MOI.get(optimizer::Optimizer, ::MOI.DualObjectiveValue)
+    value = optimizer.sol.dual_objective_value
+    if !MOIU.is_ray(MOI.get(optimizer, MOI.DualStatus()))
+        value += optimizer.sol.objective_constant
+    end
+    return value
+end
 
 function MOI.get(instance::Optimizer, ::MOI.PrimalStatus)
     flag = instance.sol.ret_val

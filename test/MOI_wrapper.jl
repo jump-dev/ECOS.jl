@@ -30,7 +30,6 @@ MOIU.@model(ECOSModelData,
 const cache = MOIU.UniversalFallback(ECOSModelData{Float64}())
 const cached = MOIU.CachingOptimizer(cache, optimizer)
 
-# Essential bridges that are needed for all tests
 const bridged = MOIB.full_bridge_optimizer(cached, Float64)
 
 # SOC2 requires 1e-4

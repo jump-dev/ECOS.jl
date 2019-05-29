@@ -77,6 +77,7 @@ function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
     optimizer.options[param.name] = value
 end
 function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    # TODO: This gives a poor error message if the name of the parameter is invalid.
     return optimizer.options[param.name]
 end
 

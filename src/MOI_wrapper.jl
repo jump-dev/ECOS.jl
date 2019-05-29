@@ -262,17 +262,17 @@ function MOI.optimize!(instance::Optimizer)
     end
     ecos_prob_ptr = ECOS.setup(n, m, cone.f, cone.l, length(cone.qa), cone.qa,
                                cone.ep, G, A, c, h, b; options...)
-    start_time = time()
     ret_val = ECOS.solve(ecos_prob_ptr)
-    solve_time = time() - start_time
+    stat = unsafe_load(unsafe_load(ecos_prob_ptr).info)
+    solve_time = stat.tsetup + stat.tsolve
     ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
     primal    = unsafe_wrap(Array, ecos_prob.x, n)[:]
     dual_eq   = unsafe_wrap(Array, ecos_prob.y, cone.f)[:]
     dual_ineq = unsafe_wrap(Array, ecos_prob.z, m)[:]
     slack     = unsafe_wrap(Array, ecos_prob.s, m)[:]
     ECOS.cleanup(ecos_prob_ptr, 0)
-    objective_value = (instance.maxsense ? -1 : 1) * dot(c, primal)
-    dual_objective_value = (instance.maxsense ? 1 : -1) * (dot(b, dual_eq) + dot(h, dual_ineq))
+    objective_value = (instance.maxsense ? -1 : 1) * stat.pcost
+    dual_objective_value = (instance.maxsense ? -1 : 1) * stat.dcost
     instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objective_value,
                             dual_objective_value, objective_constant, solve_time)
 end

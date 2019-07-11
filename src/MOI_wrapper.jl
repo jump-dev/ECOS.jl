@@ -173,7 +173,7 @@ expmap(i) = (1, 3, 2)[i]
 function orderidx(idx, s::MOI.ExponentialCone)
     expmap.(idx)
 end
-function MOIU.load_constraint(instance::Optimizer, ci, f::MOI.VectorAffineFunction, s::MOI.AbstractVectorSet)
+function MOIU.load_constraint(instance::Optimizer, ci::MOI.ConstraintIndex, f::MOI.VectorAffineFunction, s::MOI.AbstractVectorSet)
     A = sparse(output_index.(f.terms), variable_index_value.(f.terms), coefficient.(f.terms))
     # sparse combines duplicates with + but does not remove zeros created so we call dropzeros!
     dropzeros!(A)

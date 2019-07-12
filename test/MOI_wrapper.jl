@@ -19,15 +19,8 @@ end
     @test !MOIU.supports_allocate_load(optimizer, true)
 end
 
-MOIU.@model(ECOSModelData,
-            (), (), # No scalar functions
-            (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOI.SecondOrderCone,
-             MOI.ExponentialCone),
-            (),
-            (), (), # No scalar sets
-            (), (MOI.VectorAffineFunction,))
 # UniversalFallback is needed for starting values, even if they are ignored by ECOS
-const cache = MOIU.UniversalFallback(ECOSModelData{Float64}())
+const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 const cached = MOIU.CachingOptimizer(cache, optimizer)
 
 const bridged = MOIB.full_bridge_optimizer(cached, Float64)

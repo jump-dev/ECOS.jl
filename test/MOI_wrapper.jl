@@ -38,10 +38,14 @@ const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
 @testset "Unit" begin
     MOIT.unittest(bridged,
                   config,
-                  [# Need https://github.com/JuliaOpt/MathOptInterface.jl/issues/529
-                   "solve_qp_edge_cases",
-                   # Integer and ZeroOne sets are not supported
-                   "solve_integer_edge_cases", "solve_objbound_edge_cases"])
+                  [
+        # Need https://github.com/JuliaOpt/MathOptInterface.jl/issues/529
+        "solve_qp_edge_cases",
+        # Integer and ZeroOne sets are not supported
+        "solve_integer_edge_cases", "solve_objbound_edge_cases",
+        "solve_zero_one_with_bounds_1",
+        "solve_zero_one_with_bounds_2",
+        "solve_zero_one_with_bounds_3"])
 end
 
 @testset "Continuous linear problems" begin
@@ -53,6 +57,6 @@ end
 end
 
 @testset "Continuous conic problems" begin
-    exclude = ["sdp", "rootdet", "logdet"]
+    exclude = ["pow", "sdp", "rootdet", "logdet"]
     MOIT.contconictest(bridged, config, exclude)
 end

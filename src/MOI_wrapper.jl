@@ -11,12 +11,14 @@ struct Solution
     dual_eq::Vector{Float64}
     dual_ineq::Vector{Float64}
     slack::Vector{Float64}
-    objval::Float64
-    objbnd::Float64
+    objective_value::Float64
+    dual_objective_value::Float64
+    objective_constant::Float64
+    solve_time::Float64
 end
 const OPTIMIZE_NOT_CALLED = -1
 Solution() = Solution(OPTIMIZE_NOT_CALLED, Float64[], Float64[], Float64[],
-                      Float64[], NaN, NaN)
+                      Float64[], NaN, NaN, NaN, NaN)
 
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is used to build `ECOSMatrix`
@@ -32,7 +34,7 @@ mutable struct ModelData
     JG::Vector{Int} # List of equality cols
     VG::Vector{Float64} # List of equality coefficients
     h::Vector{Float64} # List of equality coefficients
-    objconstant::Float64 # The objective is min c'x + objconstant
+    objective_constant::Float64 # The objective is min c'x + objective_constant
     c::Vector{Float64}
 end
 
@@ -58,13 +60,32 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     maxsense::Bool
     data::Union{Nothing, ModelData} # only non-Nothing between MOI.copy_to and MOI.optimize!
     sol::Solution
-    options
+    silent::Bool
+    options::Dict{Symbol, Any}
     function Optimizer(; kwargs...)
-        new(ConeData(), false, nothing, Solution(), kwargs)
+        optimizer = new(ConeData(), false, nothing, Solution(), false, Dict{Symbol, Any}())
+        for (key, value) in kwargs
+            MOI.set(optimizer, MOI.RawParameter(key), value)
+        end
+        return optimizer
     end
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
+
+function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+    optimizer.options[param.name] = value
+end
+function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    # TODO: This gives a poor error message if the name of the parameter is invalid.
+    return optimizer.options[param.name]
+end
+
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+function MOI.set(optimizer::Optimizer, ::MOI.Silent, value::Bool)
+    optimizer.silent = value
+end
+MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
 function MOI.is_empty(instance::Optimizer)
     !instance.maxsense && instance.data === nothing
@@ -97,7 +118,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
     return MOIU.automatic_copy_to(dest, src; kws...)
 end
 
-using Compat.SparseArrays
+using SparseArrays
 
 # Computes cone dimensions
 constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction, MOI.Zeros}) = ci.value
@@ -152,7 +173,7 @@ expmap(i) = (1, 3, 2)[i]
 function orderidx(idx, s::MOI.ExponentialCone)
     expmap.(idx)
 end
-function MOIU.load_constraint(instance::Optimizer, ci, f::MOI.VectorAffineFunction, s::MOI.AbstractVectorSet)
+function MOIU.load_constraint(instance::Optimizer, ci::MOI.ConstraintIndex, f::MOI.VectorAffineFunction, s::MOI.AbstractVectorSet)
     A = sparse(output_index.(f.terms), variable_index_value.(f.terms), coefficient.(f.terms))
     # sparse combines duplicates with + but does not remove zeros created so we call dropzeros!
     dropzeros!(A)
@@ -214,7 +235,7 @@ function MOIU.load(instance::Optimizer, ::MOI.ObjectiveFunction,
                    f::MOI.ScalarAffineFunction)
     c0 = Vector(sparsevec(variable_index_value.(f.terms), coefficient.(f.terms),
                           instance.data.n))
-    instance.data.objconstant = f.constant
+    instance.data.objective_constant = f.constant
     instance.data.c = instance.maxsense ? -c0 : c0
     return nothing
 end
@@ -231,28 +252,61 @@ function MOI.optimize!(instance::Optimizer)
     b = instance.data.b
     G = ECOS.ECOSMatrix(sparse(instance.data.IG, instance.data.JG, instance.data.VG, m, n))
     h = instance.data.h
-    objconstant = instance.data.objconstant
+    objective_constant = instance.data.objective_constant
     c = instance.data.c
     instance.data = nothing # Allows GC to free instance.data before A is loaded to ECOS
+    options = instance.options
+    if instance.silent
+        options = copy(options)
+        options[:verbose] = false
+    end
     ecos_prob_ptr = ECOS.setup(n, m, cone.f, cone.l, length(cone.qa), cone.qa,
-                               cone.ep, G, A, c, h, b; instance.options...)
+                               cone.ep, G, A, c, h, b; options...)
     ret_val = ECOS.solve(ecos_prob_ptr)
+    stat = unsafe_load(unsafe_load(ecos_prob_ptr).info)
+    solve_time = stat.tsetup + stat.tsolve
     ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
     primal    = unsafe_wrap(Array, ecos_prob.x, n)[:]
     dual_eq   = unsafe_wrap(Array, ecos_prob.y, cone.f)[:]
     dual_ineq = unsafe_wrap(Array, ecos_prob.z, m)[:]
     slack     = unsafe_wrap(Array, ecos_prob.s, m)[:]
     ECOS.cleanup(ecos_prob_ptr, 0)
-    objval = (instance.maxsense ? -1 : 1) * dot(c, primal)
-    if ret_val != ECOS.ECOS_DINF
-        objval += objconstant
+    objective_value = (instance.maxsense ? -1 : 1) * stat.pcost
+    dual_objective_value = (instance.maxsense ? -1 : 1) * stat.dcost
+    instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objective_value,
+                            dual_objective_value, objective_constant, solve_time)
+end
+
+MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.solve_time
+function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
+    # Strings from https://github.com/ifa-ethz/ecos/blob/master/include/ecos.h
+    flag = optimizer.sol.ret_val
+    if flag == OPTIMIZE_NOT_CALLED
+        return "Optimize not called"
+    elseif flag == ECOS_OPTIMAL
+        return "Problem solved to optimality"
+    elseif flag == ECOS_OPTIMAL + ECOS_INACC_OFFSET
+        return "Problem solved to inaccurate optimality"
+    elseif flag == ECOS_PINF
+        return "Found certificate of primal infeasibility"
+    elseif flag == ECOS_PINF + ECOS_INACC_OFFSET
+        return "Found inaccurate certificate of primal infeasibility"
+    elseif flag == ECOS_DINF
+        return "Found certificate of dual infeasibility"
+    elseif flag == ECOS_DINF + ECOS_INACC_OFFSET
+        return "Found inaccurate certificate of dual infeasibility"
+    elseif flag == ECOS_MAXIT
+        return "Maximum number of iterations reached"
+    elseif flag == ECOS_NUMERICS
+        return "Search direction unreliable"
+    elseif flag == ECOS_OUTCONE
+        return "s or z got outside the cone, numerics?"
+    elseif flag == ECOS_SIGINT
+        return "solver interrupted by a signal/ctrl-c"
+    else
+        @assert flag == ECOS_FATAL
+        return "Unknown problem in solver"
     end
-    objbnd = -(dot(b, dual_eq) + dot(h, dual_ineq))
-    if ret_val != ECOS.ECOS_PINF
-        objbnd += objconstant
-    end
-    instance.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objval,
-                            objbnd)
 end
 
 # Implements getter for result value and statuses
@@ -279,8 +333,20 @@ function MOI.get(instance::Optimizer, ::MOI.TerminationStatus)
     end
 end
 
-MOI.get(instance::Optimizer, ::MOI.ObjectiveValue) = instance.sol.objval
-MOI.get(instance::Optimizer, ::MOI.ObjectiveBound) = instance.sol.objbnd
+function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
+    value = optimizer.sol.objective_value
+    if !MOIU.is_ray(MOI.get(optimizer, MOI.PrimalStatus()))
+        value += optimizer.sol.objective_constant
+    end
+    return value
+end
+function MOI.get(optimizer::Optimizer, ::MOI.DualObjectiveValue)
+    value = optimizer.sol.dual_objective_value
+    if !MOIU.is_ray(MOI.get(optimizer, MOI.DualStatus()))
+        value += optimizer.sol.objective_constant
+    end
+    return value
+end
 
 function MOI.get(instance::Optimizer, ::MOI.PrimalStatus)
     flag = instance.sol.ret_val

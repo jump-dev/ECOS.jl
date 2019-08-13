@@ -7,8 +7,8 @@
 # Test the MathProgBase.jl interface for the ECOS.jl solver wrapper
 #############################################################################
 
-using Compat.Test
-using Compat.LinearAlgebra
+using Test
+using LinearAlgebra
 using MathProgBase
 using ECOS
 

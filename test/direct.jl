@@ -7,9 +7,9 @@
 # Test the direct interface for the ECOS.jl solver wrapper
 #############################################################################
 
-using Compat.Test
-using Compat.LinearAlgebra
-using Compat.SparseArrays
+using Test
+using LinearAlgebra
+using SparseArrays
 
 # The values below are copied from data.h in ECOS source code
 import ECOS

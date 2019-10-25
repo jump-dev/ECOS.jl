@@ -32,6 +32,8 @@ const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
     MOIT.unittest(bridged,
                   config,
                   [
+        # `NumberOfThreads` not supported.
+        "number_threads",
         # `TimeLimitSec` not supported.
         "time_limit_sec",
         # Need https://github.com/JuliaOpt/MathOptInterface.jl/issues/529
@@ -52,6 +54,6 @@ end
 end
 
 @testset "Continuous conic problems" begin
-    exclude = ["pow", "sdp", "rootdet", "logdet"]
+    exclude = ["dualexp", "pow", "dualpow", "sdp", "rootdet", "logdet"]
     MOIT.contconictest(bridged, config, exclude)
 end

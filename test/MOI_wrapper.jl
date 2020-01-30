@@ -54,6 +54,6 @@ end
 end
 
 @testset "Continuous conic problems" begin
-    exclude = ["dualexp", "pow", "dualpow", "sdp", "rootdet", "logdet"]
+    exclude = ["dualexp", "pow", "dualpow", "sdp", "rootdet", "logdet", "normnuc", "normspec"]
     MOIT.contconictest(bridged, config, exclude)
 end

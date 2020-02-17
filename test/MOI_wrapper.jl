@@ -57,3 +57,14 @@ end
     exclude = ["dualexp", "pow", "dualpow", "sdp", "rootdet", "logdet", "normnuc", "normspec"]
     MOIT.contconictest(bridged, config, exclude)
 end
+
+@testset "MOI.RawParameter" begin
+    model = ECOS.Optimizer()
+    # TODO: remove symbol cases when deprecation is removed.
+    MOI.set(model, MOI.RawParameter(:abstol), 1e-5)
+    @test MOI.get(model, MOI.RawParameter(:abstol)) ≈ 1e-5
+    @test MOI.get(model, MOI.RawParameter("abstol")) ≈ 1e-5
+    MOI.set(model, MOI.RawParameter("abstol"), 2e-5)
+    @test MOI.get(model, MOI.RawParameter(:abstol)) ≈ 2e-5
+    @test MOI.get(model, MOI.RawParameter("abstol")) == 2e-5
+end

@@ -65,7 +65,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     function Optimizer(; kwargs...)
         optimizer = new(ConeData(), false, nothing, Solution(), false, Dict{Symbol, Any}())
         for (key, value) in kwargs
-            MOI.set(optimizer, MOI.RawParameter(key), value)
+            MOI.set(optimizer, MOI.RawParameter(String(key)), value)
         end
         return optimizer
     end
@@ -74,11 +74,25 @@ end
 MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
-    optimizer.options[param.name] = value
+    if !(param.name isa String)
+        Base.depwarn(
+            "passing `$(param.name)` to `MOI.RawParameter` as type " *
+            "`$(typeof(param.name))` is deprecated. Use a string instead.",
+            Symbol("MOI.set")
+        )
+    end
+    optimizer.options[Symbol(param.name)] = value
 end
 function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    if !(param.name isa String)
+        Base.depwarn(
+            "passing $(param.name) to `MOI.RawParameter` as type " *
+            "$(typeof(param.name)) is deprecated. Use a string instead.",
+            Symbol("MOI.get")
+        )
+    end
     # TODO: This gives a poor error message if the name of the parameter is invalid.
-    return optimizer.options[param.name]
+    return optimizer.options[Symbol(param.name)]
 end
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true

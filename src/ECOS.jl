@@ -13,12 +13,16 @@ using SparseArrays
 using LinearAlgebra
 
 # Try to load the binary dependency
-if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
-    include("../deps/deps.jl")
+if VERSION < v"1.3"
+    if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
+        include("../deps/deps.jl")
+    else
+        error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")
+    end
 else
-    error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")
+    import ECOS_jll
+    const ecos = ECOS_jll.libecos
 end
-
 # ver  [not exported]
 # Returns the version of ECOS in use
 function ver()

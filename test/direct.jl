@@ -1,7 +1,7 @@
 #############################################################################
 # ECOS.jl
 # Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
-# See http://github.com/JuliaOpt/ECOS.jl
+# See http://github.com/jump-dev/ECOS.jl
 #############################################################################
 # test/direct.jl
 # Test the direct interface for the ECOS.jl solver wrapper

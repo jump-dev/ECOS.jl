@@ -36,7 +36,7 @@ const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
         "number_threads",
         # `TimeLimitSec` not supported.
         "time_limit_sec",
-        # Need https://github.com/JuliaOpt/MathOptInterface.jl/issues/529
+        # Need https://github.com/jump-dev/MathOptInterface.jl/issues/529
         "solve_qp_edge_cases",
         # Integer and ZeroOne sets are not supported
         "solve_integer_edge_cases", "solve_objbound_edge_cases",

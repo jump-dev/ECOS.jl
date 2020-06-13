@@ -26,7 +26,7 @@ Note that the custom binaries will not be overwritten by subsequent builds of th
 
 The ECOS interface is completely wrapped. ECOS functions corresponding to the C API are available as `ECOS.setup`, `ECOS.solve`, `ECOS.cleanup`, and `ECOS.ver` (these are not exported from the module). Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.
 
-ECOS.jl also supports the **[MathOptInterface](https://github.com/JuliaOpt/MathOptInterface.jl)** standard solver interface.
+ECOS.jl also supports the **[MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)** standard solver interface.
 Thanks to this support ECOS can be used as a solver with both the **[JuMP]** and **[Convex.jl]** modeling languages.
 
 All ECOS solver options can be set through the direct interface and through MathOptInterface.
@@ -85,16 +85,15 @@ println(value(take))
 `ECOS.jl` is licensed under the MIT License (see LICENSE.md), but note that ECOS itself is GPL v3.
 
 [MathProgBase]: https://github.com/JuliaOpt/MathProgBase.jl
-[JuMP]: https://github.com/JuliaOpt/JuMP.jl
+[JuMP]: https://github.com/jump-dev/JuMP.jl
 [Convex.jl]: https://github.com/JuliaOpt/Convex.jl
 [Homebrew.jl]: https://github.com/JuliaLang/Homebrew.jl
-[JuliaOpt]: http://juliaopt.org
 
-[build-img]: https://travis-ci.org/JuliaOpt/ECOS.jl.svg?branch=master
-[build-url]: https://travis-ci.org/JuliaOpt/ECOS.jl
+[build-img]: https://travis-ci.org/jump-dev/ECOS.jl.svg?branch=master
+[build-url]: https://travis-ci.org/jump-dev/ECOS.jl
 [winbuild-img]: https://ci.appveyor.com/api/projects/status/n0c8b6t1w39jho6d/branch/master?svg=true
 [winbuild-url]: https://ci.appveyor.com/project/JuliaOpt/ecos-jl/branch/master
-[coveralls-img]: https://coveralls.io/repos/github/JuliaOpt/ECOS.jl/badge.svg?branch=master
-[coveralls-url]: https://coveralls.io/github/JuliaOpt/ECOS.jl?branch=master
-[codecov-img]: http://codecov.io/github/JuliaOpt/ECOS.jl/coverage.svg?branch=master
-[codecov-url]: http://codecov.io/github/JuliaOpt/ECOS.jl?branch=master
+[coveralls-img]: https://coveralls.io/repos/github/jump-dev/ECOS.jl/badge.svg?branch=master
+[coveralls-url]: https://coveralls.io/github/jump-dev/ECOS.jl?branch=master
+[codecov-img]: http://codecov.io/github/jump-dev/ECOS.jl/coverage.svg?branch=master
+[codecov-url]: http://codecov.io/github/jump-dev/ECOS.jl?branch=master

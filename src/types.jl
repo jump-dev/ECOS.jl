@@ -1,7 +1,7 @@
 #############################################################################
 # ECOS.jl
 # Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
-# See http://github.com/JuliaOpt/ECOS.jl
+# See http://github.com/jump-dev/ECOS.jl
 #############################################################################
 # types.jl
 # Julia implementations of the types defined in ecos.h

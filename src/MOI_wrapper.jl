@@ -187,10 +187,10 @@ function orderidx(idx, s::MOI.ExponentialCone)
     expmap.(idx)
 end
 function MOIU.load_constraint(optimizer::Optimizer, ci::MOI.ConstraintIndex, f::MOI.VectorAffineFunction, s::MOI.AbstractVectorSet)
-    A = sparse(output_index.(f.terms), variable_index_value.(f.terms), coefficient.(f.terms))
-    # sparse combines duplicates with + but does not remove zeros created so we call dropzeros!
-    dropzeros!(A)
-    I, J, V = findnz(A)
+    func = MOIU.canonical(f)
+    I = Int[output_index(term) for term in func.terms]
+    J = Int[variable_index_value(term) for term in func.terms]
+    V = Float64[-coefficient(term) for term in func.terms]
     offset = constroffset(optimizer, ci)
     rows = constrrows(s)
     if s isa MOI.Zeros
@@ -205,7 +205,7 @@ function MOIU.load_constraint(optimizer::Optimizer, ci::MOI.ConstraintIndex, f::
     b[i] .= orderval(f.constants, s)
     append!(Is, offset .+ orderidx(I, s))
     append!(Js, J)
-    append!(Vs, -V)
+    append!(Vs, V)
 end
 
 function MOIU.allocate_variables(optimizer::Optimizer, nvars::Integer)

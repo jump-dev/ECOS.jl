@@ -25,6 +25,10 @@ else
 end
 # ver  [not exported]
 # Returns the version of ECOS in use
+#
+# Note: Avoid calling this function at the top-level as doing so breaks creating system
+# images which include this package
+# https://github.com/jump-dev/ECOS.jl/issues/106
 function ver()
     ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{UInt8}, ())
     return unsafe_string(ver_ptr)

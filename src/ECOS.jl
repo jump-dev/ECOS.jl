@@ -40,14 +40,6 @@ macro ecos_ccall(func, args...)
     end
 end
 
-function __init__()
-    vnum = VersionNumber(ver())
-    if !(vnum.major == 2 && vnum.minor == 0)
-        depsdir = realpath(joinpath(dirname(@__FILE__),"..","deps"))
-        error("Current ECOS version installed is $(ver()), but we require version 2.0.*. On Linux and Windows, delete the contents of the `$depsdir` directory except for the files `build.jl` and `.gitignore`, then rerun Pkg.build(\"ECOS\"). On OS X, run `using Homebrew; Homebrew.update()` in Julia.")
-    end
-end
-
 include("types.jl")  # All the types and constants defined in ecos.h
 
 # A julia container for matrices passed to ECOS.

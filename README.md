@@ -16,6 +16,10 @@ julia> Pkg.add("ECOS")
 
 ECOS.jl will automatically install and setup the ECOS solver itself using [BinaryProvider.jl](https://github.com/JuliaPackaging/BinaryProvider.jl).
 
+## Custom Installation
+
+After ECOS.jl is installed and built, you can replace the installed `libecos` dependency with a custom installation by following the [Pkg documentation for overriding artifacts](https://julialang.github.io/Pkg.jl/v1/artifacts/#Overriding-artifact-locations-1). Note that your custom `libecos` is required to be at least version 2.0.5.
+
 ## Usage
 
 The ECOS interface is completely wrapped. ECOS functions corresponding to the C API are available as `ECOS.setup`, `ECOS.solve`, `ECOS.cleanup`, and `ECOS.ver` (these are not exported from the module). Function arguments are extensively documented in the source, and an example of usage can be found in `test/direct.jl`.

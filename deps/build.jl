@@ -36,8 +36,8 @@ unsatisfied = any(!satisfied(p; verbose=verbose) for p in products)
 if haskey(download_info, platform_key())
     url, tarball_hash = download_info[platform_key()]
     # Check if this build.jl is providing new versions of the binaries, and
-    # if so, ovewrite the current binaries even if they were installed by the user 
-    if unsatisfied || !isinstalled(url, tarball_hash; prefix=prefix) 
+    # if so, ovewrite the current binaries even if they were installed by the user
+    if unsatisfied || !isinstalled(url, tarball_hash; prefix=prefix)
         # Download and install binaries
         install(url, tarball_hash; prefix=prefix, force=true, verbose=verbose)
     end

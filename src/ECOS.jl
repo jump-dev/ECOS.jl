@@ -44,6 +44,13 @@ macro ecos_ccall(func, args...)
     end
 end
 
+function __init__()
+    libecos_version = VersionNumber(ver())
+    if libecos_version < v"2.0.5"
+        error("Current ECOS version installed is $(ver()), but we require minimum version of 2.0.5")
+    end
+end
+
 include("types.jl")  # All the types and constants defined in ecos.h
 
 # A julia container for matrices passed to ECOS.

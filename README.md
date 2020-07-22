@@ -18,9 +18,7 @@ ECOS.jl will automatically install and setup the ECOS solver itself using [Binar
 
 ## Custom Installation
 
-After ECOS.jl is installed and built, you can replace the installed binary dependencies with custom builds by overwritting the binaries and libraries in ECOS.jl's `deps/usr` folder (e.g. in Julia v0.6 `$HOME/.julia/v0.6/ECOS/deps/usr`).
-
-Note that the custom binaries will not be overwritten by subsequent builds of the currently installed version of ECOS.jl. However, if ECOS.jl is updated and the update includes new BinaryProvider versions of the ECOS binaries, then the custom binaries will be overwritten by the new BinaryProvider versions.
+After ECOS.jl is installed and built, you can replace the installed `libecos` dependency with a custom installation by following the [Pkg documentation for overriding artifacts](https://julialang.github.io/Pkg.jl/v1/artifacts/#Overriding-artifact-locations-1). Note that your custom `libecos` is required to be at least version 2.0.5.
 
 ## Usage
 

@@ -71,7 +71,7 @@ model = Model(with_optimizer(ECOS.Optimizer))
 @constraint(model, sum(weight[item] * take[item] for item in items) <= 3)
 optimize!(model)
 
-println(value(take))
+println(value.(take))
 # take
 # [  Gold] = 0.9999999680446406
 # [Silver] = 0.46666670881026834

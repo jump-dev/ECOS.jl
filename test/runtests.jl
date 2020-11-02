@@ -9,8 +9,7 @@
 
 using ECOS
 
-using Compat
-using Compat.Test
+using Test
 
 @testset "Test the direct interface" begin
     include("direct.jl")

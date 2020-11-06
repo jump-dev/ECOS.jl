@@ -1,11 +1,10 @@
 # ECOS.jl
 
-| **Build Status** |
-|:----------------:|
-| [![Build Status][build-img]][build-url] [![Build Status][winbuild-img]][winbuild-url] |
-| [![Coveralls branch][coveralls-img]][coveralls-url] [![Codecov branch][codecov-img]][codecov-url] |
+Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable conic
+optimization interior point solver.
 
-Julia wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable conic optimization interior point solver.
+[![Build Status](https://github.com/jump-dev/ECOS.jl/workflows/CI/badge.svg?branch=master)](https://github.com/jump-dev/ECOS.jl/actions?query=workflow%3ACI)
+[![codecov](https://codecov.io/gh/jump-dev/ECOS.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jump-dev/ECOS.jl)
 
 ## Installation
 
@@ -86,12 +85,3 @@ println(value.(take))
 [JuMP]: https://github.com/jump-dev/JuMP.jl
 [Convex.jl]: https://github.com/JuliaOpt/Convex.jl
 [Homebrew.jl]: https://github.com/JuliaLang/Homebrew.jl
-
-[build-img]: https://travis-ci.com/jump-dev/ECOS.jl.svg?branch=master
-[build-url]: https://travis-ci.com/jump-dev/ECOS.jl
-[winbuild-img]: https://ci.appveyor.com/api/projects/status/n0c8b6t1w39jho6d/branch/master?svg=true
-[winbuild-url]: https://ci.appveyor.com/project/JuliaOpt/ecos-jl/branch/master
-[coveralls-img]: https://coveralls.io/repos/github/jump-dev/ECOS.jl/badge.svg?branch=master
-[coveralls-url]: https://coveralls.io/github/jump-dev/ECOS.jl?branch=master
-[codecov-img]: http://codecov.io/github/jump-dev/ECOS.jl/coverage.svg?branch=master
-[codecov-url]: http://codecov.io/github/jump-dev/ECOS.jl?branch=master

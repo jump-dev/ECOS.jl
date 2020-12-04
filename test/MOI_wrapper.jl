@@ -68,3 +68,33 @@ end
     @test MOI.get(model, MOI.RawParameter(:abstol)) ≈ 2e-5
     @test MOI.get(model, MOI.RawParameter("abstol")) == 2e-5
 end
+
+@testset "Iteration Limit" begin
+    # Problem data
+    v = [5.0, 3.0, 1.0]
+    w = [2.0, 1.5, 0.3]
+
+    MOI.empty!(bridged)
+
+    MOI.set(bridged, MOI.RawParameter("maxit"), 1)
+    MOI.set(bridged, MOI.Silent(), true)
+
+    x = MOI.add_variables(bridged, 3)
+    for xj in x
+        MOI.add_constraint(bridged, MOI.SingleVariable(xj), MOI.Interval(0.0, 1.0))
+    end
+
+    # Constraint
+    MOI.add_constraint(bridged, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(w, x), 0.0), MOI.LessThan(3.0))
+
+    # Set the objective
+    MOI.set(bridged,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(v, x), 0.0)
+    )
+    MOI.set(bridged, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+
+    MOI.optimize!(bridged)
+
+    @test MOI.get(bridged, MOI.TerminationStatus()) == MOI.ITERATION_LIMIT
+end

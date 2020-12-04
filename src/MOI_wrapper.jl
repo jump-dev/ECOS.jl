@@ -16,7 +16,8 @@ struct Solution
     objective_constant::Float64
     solve_time::Float64
 end
-const OPTIMIZE_NOT_CALLED = -1
+# The values used by ECOS are from -7 to 10 so -10 should be safe
+const OPTIMIZE_NOT_CALLED = -10
 Solution() = Solution(OPTIMIZE_NOT_CALLED, Float64[], Float64[], Float64[],
                       Float64[], NaN, NaN, NaN, NaN)
 
@@ -327,7 +328,13 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     elseif flag == ECOS.ECOS_DINF
         return MOI.DUAL_INFEASIBLE
     elseif flag == ECOS.ECOS_MAXIT
-        return MOI.IterationLimit
+        return MOI.ITERATION_LIMIT
+    elseif flag == ECOS.ECOS_NUMERICS || flag == ECOS.ECOS_OUTCONE
+        return MOI.NUMERICAL_ERROR
+    elseif flag == ECOS.ECOS_SIGINT
+        return MOI.INTERRUPTED
+    elseif flag == ECOS.ECOS_FATAL
+        return MOI.OTHER_ERROR
     elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
         return MOI.ALMOST_OPTIMAL
     elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
@@ -335,7 +342,7 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
         return MOI.ALMOST_DUAL_INFEASIBLE
     else
-        return MOI.OTHER_ERROR
+        error("Unrecognized ECOS solve status flag: $flag.")
     end
 end
 

@@ -6,7 +6,7 @@ const VI = MOI.VariableIndex
 const MOIU = MOI.Utilities
 
 struct Solution
-    ret_val::Int
+    ret_val::Union{Nothing, Int}
     primal::Vector{Float64}
     dual_eq::Vector{Float64}
     dual_ineq::Vector{Float64}
@@ -17,8 +17,7 @@ struct Solution
     solve_time::Float64
 end
 # The values used by ECOS are from -7 to 10 so -10 should be safe
-const OPTIMIZE_NOT_CALLED = -10
-Solution() = Solution(OPTIMIZE_NOT_CALLED, Float64[], Float64[], Float64[],
+Solution() = Solution(nothing, Float64[], Float64[], Float64[],
                       Float64[], NaN, NaN, NaN, NaN)
 
 # Used to build the data with allocate-load during `copy_to`.
@@ -288,7 +287,7 @@ MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.solve_time
 function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
     # Strings from https://github.com/ifa-ethz/ecos/blob/master/include/ecos.h
     flag = optimizer.sol.ret_val
-    if flag == OPTIMIZE_NOT_CALLED
+    if flag === nothing
         return "Optimize not called"
     elseif flag == ECOS_OPTIMAL
         return "Problem solved to optimality"
@@ -319,7 +318,7 @@ end
 # Implements getter for result value and statuses
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     flag = optimizer.sol.ret_val
-    if flag == OPTIMIZE_NOT_CALLED
+    if flag === nothing
         return MOI.OPTIMIZE_NOT_CALLED
     elseif flag == ECOS.ECOS_OPTIMAL
         return MOI.OPTIMAL

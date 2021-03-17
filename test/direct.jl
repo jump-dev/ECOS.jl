@@ -48,12 +48,12 @@ function test1()
     A = ECOS.ECOSMatrix(Apr, Ajc, Air)
     mywork = ECOS.setup(n, m, p, l, ncones, q, 0, G, A, c, h, b)
 
-    exitflag = ECOS.solve(mywork)
+    exitflag = ECOS.ECOS_solve(mywork)
     @show exitflag
     @test exitflag == ECOS.ECOS_OPTIMAL
 
     # Call after comparing values with correct values
-    ECOS.cleanup(mywork, 0)
+    ECOS.ECOS_cleanup(mywork, 0)
 end
 test1()
 
@@ -102,10 +102,10 @@ function test2()
                                                         float(h),
                                                         float(b))
 
-    exitflag = ECOS.solve(infeas_prob)
+    exitflag = ECOS.ECOS_solve(infeas_prob)
     @show exitflag
     @test exitflag == ECOS.ECOS_PINF
 
-    ECOS.cleanup(infeas_prob, 0)
+    ECOS.ECOS_cleanup(infeas_prob, 0)
 end
 test2()

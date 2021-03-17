@@ -47,10 +47,9 @@ b = [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.
 
 G = ECOS.ECOSMatrix(Gpr, Gjc, Gir)
 A = ECOS.ECOSMatrix(Apr, Ajc, Air)
+
 mywork = ECOS.setup(n, m, p, l, ncones, q, 0, G, A, c, h, b; maxit=1)
-
-exitflag = ECOS.solve(mywork)
+exitflag = ECOS.ECOS_solve(mywork)
 @test exitflag == ECOS.ECOS_MAXIT
-
 # Call after comparing values with correct values
-ECOS.cleanup(mywork, 0)
+ECOS.ECOS_cleanup(mywork, 0)

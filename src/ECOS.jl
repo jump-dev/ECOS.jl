@@ -23,35 +23,27 @@ else
     import ECOS_jll
     const ecos = ECOS_jll.libecos
 end
+
+using CEnum
+include("gen/ctypes.jl")
+include("gen/libecos_common.jl")
+include("gen/libecos_api.jl")
+
 # ver  [not exported]
 # Returns the version of ECOS in use
 #
 # Note: Avoid calling this function at the top-level as doing so breaks creating system
 # images which include this package
 # https://github.com/jump-dev/ECOS.jl/issues/106
-function ver()
-    ver_ptr = ccall((:ECOS_ver, ECOS.ecos), Ptr{UInt8}, ())
-    return unsafe_string(ver_ptr)
-end
-
-macro ecos_ccall(func, args...)
-    args = map(esc,args)
-    f = "ECOS_$(func)"
-    quote
-        @unix_only ret = ccall(($f,ECOS.ecos), $(args...))
-        @windows_only ret = ccall(($f,ECOS.ecos), stdcall, $(args...))
-        ret
-    end
-end
+ver() = unsafe_string(ECOS_ver())
 
 function __init__()
     libecos_version = VersionNumber(ver())
     if libecos_version < v"2.0.5"
-        error("Current ECOS version installed is $(ver()), but we require minimum version of 2.0.5")
+        error("Current ECOS version installed is $(ver()), but we require minimum version of 2.0.8")
     end
+    return
 end
-
-include("types.jl")  # All the types and constants defined in ecos.h
 
 # A julia container for matrices passed to ECOS.
 # This makes it easy for the Julia GC to track these arrays.
@@ -66,7 +58,6 @@ function ECOSMatrix(mat::AbstractMatrix)
     sparsemat = sparse(mat)
     return ECOSMatrix(sparsemat.nzval, sparsemat.colptr .- 1, sparsemat.rowval .- 1)
 end
-
 
 # setup  (direct interface)
 # Provide ECOS with a problem in the form
@@ -99,62 +90,61 @@ end
 # **NOTE**: ECOS retains references to the problem data passed in here.
 # You *must* ensure that G, A, c, h, and b are not freed until after cleanup(), otherwise
 # memory corruption will occur.
-function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int},Nothing}, e::Int,
-               G::ECOSMatrix, A::Union{ECOSMatrix, Nothing},
-               c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Nothing}; kwargs...)
+function setup(
+    n::Int,
+    m::Int,
+    p::Int,
+    l::Int,
+    ncones::Int,
+    q::Union{Vector{Int},Nothing},
+    e::Int,
+    G::ECOSMatrix,
+    A::Union{ECOSMatrix,Nothing},
+    c::Vector{Float64},
+    h::Vector{Float64},
+    b::Union{Vector{Float64},Nothing};
+    kwargs...,
+)
     # Convert to canonical forms
-    q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
-    Apr = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.pr
-    Ajc = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.jc
-    Air = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.ir
-    b = (b == nothing) ? convert(Ptr{Cdouble}, C_NULL) : b
-    problem_ptr = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork},
-        (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Clong,
-         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
-         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
-         Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}),
-        n, m, p, l, ncones, q, e,
-        G.pr, G.jc, G.ir,
-        Apr, Ajc, Air,
-        c, h, b)
+    problem_ptr = ECOS_setup(
+        n,
+        m,
+        p,
+        l,
+        ncones,
+        q === nothing ? C_NULL : q,
+        e,
+        G.pr,
+        G.jc,
+        G.ir,
+        A === nothing ? C_NULL : A.pr,
+        A === nothing ? C_NULL : A.jc,
+        A === nothing ? C_NULL : A.ir,
+        c,
+        h,
+        b === nothing ? C_NULL : b,
+    )
 
-    problem_ptr != C_NULL || error("ECOS failed to construct problem.")
-
+    if problem_ptr == C_NULL
+        error("ECOS failed to construct problem.")
+    end
     if !isempty(kwargs)
         problem = unsafe_load(problem_ptr)
-        problem.stgs != C_NULL || error("ECOS returned a malformed settings struct.")
-        settings = unsafe_load(problem.stgs)
-
-        options = Dict{Symbol, Any}()
-        for (k,v) in kwargs
-            options[k] = v
+        if problem.stgs == C_NULL
+            error("ECOS returned a malformed settings struct.")
         end
-
-        new_settings = Csettings([
-            setting in keys(options) ?
-            convert(fieldtype(typeof(settings), setting), options[setting]) :
-            getfield(settings, setting)
-            for setting in fieldnames(typeof(settings))]...)
-
+        old_settings = unsafe_load(problem.stgs)
+        options = Dict{Symbol,Any}(k => v for (k,v) in kwargs)
+        new_settings = settings([
+            convert(
+                fieldtype(settings, key),
+                get(options, key, getfield(old_settings, key)),
+            )
+            for key in fieldnames(settings)
+        ]...)
         unsafe_store!(problem.stgs, new_settings)
     end
-
-    problem_ptr
-end
-
-# solve
-# Solves the provided problem. Results are stored inside the structure,
-# but currently there is no convenient interface-provided way to access
-# this - use MathProgBase interface.
-function solve(problem::Ptr{Cpwork})
-    exitflag = ccall((:ECOS_solve, ECOS.ecos), Clong, (Ptr{Cpwork},), problem)
-end
-
-# cleanup
-# Frees memory allocated by ECOS for the problem.
-# The optional keepvars argument is number of variables to NOT free.
-function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
-    ccall((:ECOS_cleanup, ECOS.ecos), Cvoid, (Ptr{Cpwork}, Clong), problem, keepvars)
+    return problem_ptr
 end
 
 include("MPB_wrapper.jl")

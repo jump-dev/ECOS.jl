@@ -91,7 +91,7 @@ function MPB.optimize!(m::ECOSMathProgModel)
     # Note: ECOS modifies problem data in setup() and restores it on cleanup()
 
     t = time()
-    flag = solve(ecos_prob_ptr)
+    flag = ECOS_solve(ecos_prob_ptr)
     m.solve_time = time() - t
     if flag == ECOS_OPTIMAL
         m.solve_stat = :Optimal
@@ -111,7 +111,7 @@ function MPB.optimize!(m::ECOSMathProgModel)
     m.primal_sol = unsafe_wrap(Array,ecos_prob.x, m.nvar)[:]
     m.dual_sol_eq   = unsafe_wrap(Array,ecos_prob.y, m.neq)[:]
     m.dual_sol_ineq = unsafe_wrap(Array,ecos_prob.z, m.nineq)[:]
-    cleanup(ecos_prob_ptr, 0)
+    ECOS_cleanup(ecos_prob_ptr, 0)
     # Compute this value after cleanup with restored c.
     m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
 end

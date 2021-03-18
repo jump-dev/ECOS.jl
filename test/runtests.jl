@@ -11,9 +11,9 @@ using ECOS
 
 using Test
 
-@testset "Test the direct interface" begin
-    include("direct.jl")
-end
+# @testset "Test the direct interface" begin
+#     include("direct.jl")
+# end
 
 @testset "Test passing options" begin
     include("options.jl")

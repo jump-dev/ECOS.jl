@@ -82,7 +82,7 @@ MPB.LinearQuadraticModel(s::ECOSSolver) = MPB.ConicToLPQPBridge(MPB.ConicModel(s
 
 
 function MPB.optimize!(m::ECOSMathProgModel)
-    ecos_prob_ptr = setup(
+    ecos_prob_p = setup(
         m.nvar, m.nineq, m.neq,
         m.npos, m.ncones, m.conedims, m.nexp_cones,
         m.G, m.A,
@@ -91,7 +91,7 @@ function MPB.optimize!(m::ECOSMathProgModel)
     # Note: ECOS modifies problem data in setup() and restores it on cleanup()
 
     t = time()
-    flag = ECOS_solve(ecos_prob_ptr)
+    flag = ECOS_solve(ecos_prob_p)
     m.solve_time = time() - t
     if flag == ECOS_OPTIMAL
         m.solve_stat = :Optimal
@@ -107,13 +107,13 @@ function MPB.optimize!(m::ECOSMathProgModel)
         m.solve_stat = :Error
     end
     # Extract solution
-    ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
-    m.primal_sol = unsafe_wrap(Array,ecos_prob.x, m.nvar)[:]
-    m.dual_sol_eq   = unsafe_wrap(Array,ecos_prob.y, m.neq)[:]
-    m.dual_sol_ineq = unsafe_wrap(Array,ecos_prob.z, m.nineq)[:]
-    ECOS_cleanup(ecos_prob_ptr, 0)
+    ecos_prob = unsafe_load(ecos_prob_p.ptr)
+    m.primal_sol = copy(unsafe_wrap(Array, ecos_prob.x, m.nvar))
+    m.dual_sol_eq   = copy(unsafe_wrap(Array, ecos_prob.y, m.neq))
+    m.dual_sol_ineq = copy(unsafe_wrap(Array, ecos_prob.z, m.nineq))
     # Compute this value after cleanup with restored c.
     m.obj_val = dot(m.c, m.primal_sol) * (m.orig_sense == :Max ? -1 : +1)
+    return
 end
 
 MPB.status(m::ECOSMathProgModel) = m.solve_stat

@@ -266,21 +266,35 @@ function MOI.optimize!(optimizer::Optimizer)
         options = copy(options)
         options[:verbose] = false
     end
-    ecos_prob_ptr =setup(n, m, cone.f, cone.l, length(cone.qa), cone.qa,
-                               cone.ep, G, A, c, h, b; options...)
-    ret_val = ECOS_solve(ecos_prob_ptr)
-    stat = unsafe_load(unsafe_load(ecos_prob_ptr).info)
+    ecos_prob_p = setup(
+        n,
+        m,
+        cone.f,
+        cone.l,
+        length(cone.qa),
+        cone.qa,
+        cone.ep,
+        G,
+        A,
+        c,
+        h,
+        b;
+        options...,
+    )
+    ret_val = ECOS_solve(ecos_prob_p)
+    ecos_prob = unsafe_load(ecos_prob_p.ptr)
+    stat = unsafe_load(ecos_prob.info)
     solve_time = stat.tsetup + stat.tsolve
-    ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
-    primal    = unsafe_wrap(Array, ecos_prob.x, n)[:]
-    dual_eq   = unsafe_wrap(Array, ecos_prob.y, cone.f)[:]
-    dual_ineq = unsafe_wrap(Array, ecos_prob.z, m)[:]
-    slack     = unsafe_wrap(Array, ecos_prob.s, m)[:]
-    ECOS_cleanup(ecos_prob_ptr, 0)
+    primal    = copy(unsafe_wrap(Array, ecos_prob.x, n))
+    dual_eq   = copy(unsafe_wrap(Array, ecos_prob.y, cone.f))
+    dual_ineq = copy(unsafe_wrap(Array, ecos_prob.z, m))
+    slack     = copy(unsafe_wrap(Array, ecos_prob.s, m))
+    # ECOS_cleanup(ecos_prob_ptr, 0)
     objective_value = (optimizer.maxsense ? -1 : 1) * stat.pcost
     dual_objective_value = (optimizer.maxsense ? -1 : 1) * stat.dcost
     optimizer.sol = Solution(ret_val, primal, dual_eq, dual_ineq, slack, objective_value,
                             dual_objective_value, objective_constant, solve_time)
+    return
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.solve_time

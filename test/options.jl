@@ -51,5 +51,3 @@ A = ECOS.ECOSMatrix(Apr, Ajc, Air)
 mywork = ECOS.setup(n, m, p, l, ncones, q, 0, G, A, c, h, b; maxit=1)
 exitflag = ECOS.ECOS_solve(mywork)
 @test exitflag == ECOS.ECOS_MAXIT
-# Call after comparing values with correct values
-ECOS.ECOS_cleanup(mywork, 0)

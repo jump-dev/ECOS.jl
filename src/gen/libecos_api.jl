@@ -56,7 +56,6 @@ end
 
 
 function ECOS_setup(n, m, p, l, ncones, q, nex, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
-    @show (n, m, p, l, ncones, q, nex, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
     ccall((:ECOS_setup, ecos), Ptr{pwork}, (idxint, idxint, idxint, idxint, idxint, Ptr{idxint}, idxint, Ptr{pfloat}, Ptr{idxint}, Ptr{idxint}, Ptr{pfloat}, Ptr{idxint}, Ptr{idxint}, Ptr{pfloat}, Ptr{pfloat}, Ptr{pfloat}), n, m, p, l, ncones, q, nex, Gpr, Gjc, Gir, Apr, Ajc, Air, c, h, b)
 end
 

@@ -10,6 +10,7 @@
 using Test
 using LinearAlgebra
 using MathProgBase
+using SparseArrays
 using ECOS
 
 solver = ECOSSolver()

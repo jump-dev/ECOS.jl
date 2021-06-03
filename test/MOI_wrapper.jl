@@ -26,23 +26,27 @@ const cached = MOIU.CachingOptimizer(cache, optimizer)
 const bridged = MOIB.full_bridge_optimizer(cached, Float64)
 
 # SOC2 requires 1e-4
-const config = MOIT.TestConfig(atol=1e-4, rtol=1e-4)
+const config = MOIT.TestConfig(atol = 1e-4, rtol = 1e-4)
 
 @testset "Unit" begin
-    MOIT.unittest(bridged,
-                  config,
-                  [
-        # `NumberOfThreads` not supported.
-        "number_threads",
-        # `TimeLimitSec` not supported.
-        "time_limit_sec",
-        # Need https://github.com/jump-dev/MathOptInterface.jl/issues/529
-        "solve_qp_edge_cases",
-        # Integer and ZeroOne sets are not supported
-        "solve_integer_edge_cases", "solve_objbound_edge_cases",
-        "solve_zero_one_with_bounds_1",
-        "solve_zero_one_with_bounds_2",
-        "solve_zero_one_with_bounds_3"])
+    MOIT.unittest(
+        bridged,
+        config,
+        [
+            # `NumberOfThreads` not supported.
+            "number_threads",
+            # `TimeLimitSec` not supported.
+            "time_limit_sec",
+            # Need https://github.com/jump-dev/MathOptInterface.jl/issues/529
+            "solve_qp_edge_cases",
+            # Integer and ZeroOne sets are not supported
+            "solve_integer_edge_cases",
+            "solve_objbound_edge_cases",
+            "solve_zero_one_with_bounds_1",
+            "solve_zero_one_with_bounds_2",
+            "solve_zero_one_with_bounds_3",
+        ],
+    )
 end
 
 @testset "Continuous linear problems" begin
@@ -54,7 +58,16 @@ end
 end
 
 @testset "Continuous conic problems" begin
-    exclude = ["dualexp", "pow", "dualpow", "sdp", "rootdet", "logdet", "normnuc", "normspec"]
+    exclude = [
+        "dualexp",
+        "pow",
+        "dualpow",
+        "sdp",
+        "rootdet",
+        "logdet",
+        "normnuc",
+        "normspec",
+    ]
     MOIT.contconictest(bridged, config, exclude)
 end
 
@@ -81,16 +94,25 @@ end
 
     x = MOI.add_variables(bridged, 3)
     for xj in x
-        MOI.add_constraint(bridged, MOI.SingleVariable(xj), MOI.Interval(0.0, 1.0))
+        MOI.add_constraint(
+            bridged,
+            MOI.SingleVariable(xj),
+            MOI.Interval(0.0, 1.0),
+        )
     end
 
     # Constraint
-    MOI.add_constraint(bridged, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(w, x), 0.0), MOI.LessThan(3.0))
+    MOI.add_constraint(
+        bridged,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(w, x), 0.0),
+        MOI.LessThan(3.0),
+    )
 
     # Set the objective
-    MOI.set(bridged,
+    MOI.set(
+        bridged,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(v, x), 0.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(v, x), 0.0),
     )
     MOI.set(bridged, MOI.ObjectiveSense(), MOI.MAX_SENSE)
 

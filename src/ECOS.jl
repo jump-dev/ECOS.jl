@@ -14,7 +14,7 @@ using LinearAlgebra
 
 # Try to load the binary dependency
 if VERSION < v"1.3"
-    if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
+    if isfile(joinpath(dirname(@__FILE__), "..", "deps", "deps.jl"))
         include("../deps/deps.jl")
     else
         error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")
@@ -35,11 +35,11 @@ function ver()
 end
 
 macro ecos_ccall(func, args...)
-    args = map(esc,args)
+    args = map(esc, args)
     f = "ECOS_$(func)"
     quote
-        @unix_only ret = ccall(($f,ECOS.ecos), $(args...))
-        @windows_only ret = ccall(($f,ECOS.ecos), stdcall, $(args...))
+        @unix_only ret = ccall(($f, ECOS.ecos), $(args...))
+        @windows_only ret = ccall(($f, ECOS.ecos), stdcall, $(args...))
         ret
     end
 end
@@ -47,7 +47,9 @@ end
 function __init__()
     libecos_version = VersionNumber(ver())
     if libecos_version < v"2.0.5"
-        error("Current ECOS version installed is $(ver()), but we require minimum version of 2.0.5")
+        error(
+            "Current ECOS version installed is $(ver()), but we require minimum version of 2.0.5",
+        )
     end
 end
 
@@ -64,9 +66,12 @@ end
 
 function ECOSMatrix(mat::AbstractMatrix)
     sparsemat = sparse(mat)
-    return ECOSMatrix(sparsemat.nzval, sparsemat.colptr .- 1, sparsemat.rowval .- 1)
+    return ECOSMatrix(
+        sparsemat.nzval,
+        sparsemat.colptr .- 1,
+        sparsemat.rowval .- 1,
+    )
 end
-
 
 # setup  (direct interface)
 # Provide ECOS with a problem in the form
@@ -99,47 +104,94 @@ end
 # **NOTE**: ECOS retains references to the problem data passed in here.
 # You *must* ensure that G, A, c, h, and b are not freed until after cleanup(), otherwise
 # memory corruption will occur.
-function setup(n::Int, m::Int, p::Int, l::Int, ncones::Int, q::Union{Vector{Int},Nothing}, e::Int,
-               G::ECOSMatrix, A::Union{ECOSMatrix, Nothing},
-               c::Vector{Float64}, h::Vector{Float64}, b::Union{Vector{Float64},Nothing}; kwargs...)
+function setup(
+    n::Int,
+    m::Int,
+    p::Int,
+    l::Int,
+    ncones::Int,
+    q::Union{Vector{Int},Nothing},
+    e::Int,
+    G::ECOSMatrix,
+    A::Union{ECOSMatrix,Nothing},
+    c::Vector{Float64},
+    h::Vector{Float64},
+    b::Union{Vector{Float64},Nothing};
+    kwargs...,
+)
     # Convert to canonical forms
-    q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong},q)
+    q = (q == nothing) ? convert(Ptr{Clong}, C_NULL) : convert(Vector{Clong}, q)
     Apr = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.pr
     Ajc = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.jc
     Air = (A == nothing) ? convert(Ptr{Cdouble}, C_NULL) : A.ir
     b = (b == nothing) ? convert(Ptr{Cdouble}, C_NULL) : b
-    problem_ptr = ccall((:ECOS_setup, ECOS.ecos), Ptr{Cpwork},
-        (Clong, Clong, Clong, Clong, Clong, Ptr{Clong}, Clong,
-         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
-         Ptr{Cdouble}, Ptr{Clong}, Ptr{Clong},
-         Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}),
-        n, m, p, l, ncones, q, e,
-        G.pr, G.jc, G.ir,
-        Apr, Ajc, Air,
-        c, h, b)
+    problem_ptr = ccall(
+        (:ECOS_setup, ECOS.ecos),
+        Ptr{Cpwork},
+        (
+            Clong,
+            Clong,
+            Clong,
+            Clong,
+            Clong,
+            Ptr{Clong},
+            Clong,
+            Ptr{Cdouble},
+            Ptr{Clong},
+            Ptr{Clong},
+            Ptr{Cdouble},
+            Ptr{Clong},
+            Ptr{Clong},
+            Ptr{Cdouble},
+            Ptr{Cdouble},
+            Ptr{Cdouble},
+        ),
+        n,
+        m,
+        p,
+        l,
+        ncones,
+        q,
+        e,
+        G.pr,
+        G.jc,
+        G.ir,
+        Apr,
+        Ajc,
+        Air,
+        c,
+        h,
+        b,
+    )
 
     problem_ptr != C_NULL || error("ECOS failed to construct problem.")
 
     if !isempty(kwargs)
         problem = unsafe_load(problem_ptr)
-        problem.stgs != C_NULL || error("ECOS returned a malformed settings struct.")
+        problem.stgs != C_NULL ||
+            error("ECOS returned a malformed settings struct.")
         settings = unsafe_load(problem.stgs)
 
-        options = Dict{Symbol, Any}()
-        for (k,v) in kwargs
+        options = Dict{Symbol,Any}()
+        for (k, v) in kwargs
             options[k] = v
         end
 
-        new_settings = Csettings([
-            setting in keys(options) ?
-            convert(fieldtype(typeof(settings), setting), options[setting]) :
-            getfield(settings, setting)
-            for setting in fieldnames(typeof(settings))]...)
+        new_settings = Csettings(
+            [
+                setting in keys(options) ?
+                convert(
+                    fieldtype(typeof(settings), setting),
+                    options[setting],
+                ) : getfield(settings, setting) for
+                setting in fieldnames(typeof(settings))
+            ]...,
+        )
 
         unsafe_store!(problem.stgs, new_settings)
     end
 
-    problem_ptr
+    return problem_ptr
 end
 
 # solve
@@ -147,14 +199,21 @@ end
 # but currently there is no convenient interface-provided way to access
 # this - use MathProgBase interface.
 function solve(problem::Ptr{Cpwork})
-    exitflag = ccall((:ECOS_solve, ECOS.ecos), Clong, (Ptr{Cpwork},), problem)
+    return exitflag =
+        ccall((:ECOS_solve, ECOS.ecos), Clong, (Ptr{Cpwork},), problem)
 end
 
 # cleanup
 # Frees memory allocated by ECOS for the problem.
 # The optional keepvars argument is number of variables to NOT free.
 function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
-    ccall((:ECOS_cleanup, ECOS.ecos), Cvoid, (Ptr{Cpwork}, Clong), problem, keepvars)
+    return ccall(
+        (:ECOS_cleanup, ECOS.ecos),
+        Cvoid,
+        (Ptr{Cpwork}, Clong),
+        problem,
+        keepvars,
+    )
 end
 
 include("MPB_wrapper.jl")

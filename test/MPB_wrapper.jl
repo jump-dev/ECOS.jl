@@ -22,9 +22,9 @@ end
 
 @testset "Run the conic interface test from MathProgBase.jl" begin
     include(joinpath(MPB_test_path, "conicinterface.jl"))
-    coniclineartest(ECOS.ECOSSolver(), duals=true)
-    conicSOCtest(ECOS.ECOSSolver(), duals=true)
-    conicEXPtest(ECOS.ECOSSolver(), duals=true)
+    coniclineartest(ECOS.ECOSSolver(), duals = true)
+    conicSOCtest(ECOS.ECOSSolver(), duals = true)
+    conicEXPtest(ECOS.ECOSSolver(), duals = true)
     include(joinpath(MPB_test_path, "quadprog.jl"))
     socptest(ECOS.ECOSSolver())
 end

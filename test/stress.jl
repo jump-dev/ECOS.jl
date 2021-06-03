@@ -9,7 +9,6 @@ A = sprand(rows, cols, 0.01)
 b = rand(rows)
 c = rand(cols)
 
-
 coneset = [:NonNeg, :NonPos, :SOC]
 var_cones = {}
 vars_coned = 0
@@ -21,8 +20,8 @@ while true
     end
     cone = coneset[rand(1:3)]
     n_var = rand(2:5)
-    end_var = min(vars_coned+n_var, cols)
-    push!(var_cones, (cone, vars_coned+1:end_var) )
+    end_var = min(vars_coned + n_var, cols)
+    push!(var_cones, (cone, vars_coned+1:end_var))
     vars_coned += n_var
 end
 
@@ -37,23 +36,22 @@ while true
     end
     cone = coneset[rand(1:4)]
     n_row = rand(2:5)
-    end_row = min(rows_coned+n_row, rows)
-    push!(row_cones, (cone, rows_coned+1:end_row) )
+    end_row = min(rows_coned + n_row, rows)
+    push!(row_cones, (cone, rows_coned+1:end_row))
     rows_coned += n_row
 end
-
 
 using ECOS
 m = ECOS.ECOSMathProgModel()
 
 println("First run")
-@time    ECOS.loadconicproblem!(m, c, A, b, row_cones, var_cones)
+@time ECOS.loadconicproblem!(m, c, A, b, row_cones, var_cones)
 Base.gc()
 
 println("Second run")
 @profile ECOS.loadconicproblem!(m, c, A, b, row_cones, var_cones)
-Profile.print(format=:flat)
+Profile.print(format = :flat)
 Base.gc()
 
 println("Third run")
-@time    ECOS.loadconicproblem!(m, c, A, b, row_cones, var_cones)
+@time ECOS.loadconicproblem!(m, c, A, b, row_cones, var_cones)

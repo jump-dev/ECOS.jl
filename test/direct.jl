@@ -1,3 +1,4 @@
+#! format: off
 #############################################################################
 # ECOS.jl
 # Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos

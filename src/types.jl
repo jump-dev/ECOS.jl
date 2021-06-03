@@ -12,16 +12,15 @@
 
 # Solve status flags
 # From: https://github.com/ifa-ethz/ecos/blob/master/include/ecos.h
-const ECOS_OPTIMAL      =  0  # Problem solved to optimality
-const ECOS_PINF         =  1  # Found certificate of primal infeasibility
-const ECOS_DINF         =  2  # Found certificate of dual infeasibility
+const ECOS_OPTIMAL = 0  # Problem solved to optimality
+const ECOS_PINF = 1  # Found certificate of primal infeasibility
+const ECOS_DINF = 2  # Found certificate of dual infeasibility
 const ECOS_INACC_OFFSET = 10  # Offset exitflag at inaccurate results
-const ECOS_MAXIT        = -1  # Maximum number of iterations reached
-const ECOS_NUMERICS     = -2  # Search direction unreliable
-const ECOS_OUTCONE      = -3  # s or z got outside the cone, numerics?
-const ECOS_SIGINT       = -4  # solver interrupted by a signal/ctrl-c
-const ECOS_FATAL        = -7  # Unknown problem in solver
-
+const ECOS_MAXIT = -1  # Maximum number of iterations reached
+const ECOS_NUMERICS = -2  # Search direction unreliable
+const ECOS_OUTCONE = -3  # s or z got outside the cone, numerics?
+const ECOS_SIGINT = -4  # solver interrupted by a signal/ctrl-c
+const ECOS_FATAL = -7  # Unknown problem in solver
 
 struct Clpcone
     p::Clong

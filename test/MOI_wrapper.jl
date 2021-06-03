@@ -26,7 +26,7 @@ const cached = MOIU.CachingOptimizer(cache, optimizer)
 const bridged = MOIB.full_bridge_optimizer(cached, Float64)
 
 # SOC2 requires 1e-4
-const config = MOIT.TestConfig(atol = 1e-4, rtol = 1e-4)
+const config = MOIT.Config(atol = 1e-4, rtol = 1e-4)
 
 @testset "Unit" begin
     MOIT.unittest(
@@ -71,15 +71,12 @@ end
     MOIT.contconictest(bridged, config, exclude)
 end
 
-@testset "MOI.RawParameter" begin
+@testset "MOI.RawOptimizerAttribute" begin
     model = ECOS.Optimizer()
-    # TODO: remove symbol cases when deprecation is removed.
-    MOI.set(model, MOI.RawParameter(:abstol), 1e-5)
-    @test MOI.get(model, MOI.RawParameter(:abstol)) ≈ 1e-5
-    @test MOI.get(model, MOI.RawParameter("abstol")) ≈ 1e-5
-    MOI.set(model, MOI.RawParameter("abstol"), 2e-5)
-    @test MOI.get(model, MOI.RawParameter(:abstol)) ≈ 2e-5
-    @test MOI.get(model, MOI.RawParameter("abstol")) == 2e-5
+    MOI.set(model, MOI.RawOptimizerAttribute("abstol"), 1e-5)
+    @test MOI.get(model, MOI.RawOptimizerAttribute("abstol")) ≈ 1e-5
+    MOI.set(model, MOI.RawOptimizerAttribute("abstol"), 2e-5)
+    @test MOI.get(model, MOI.RawOptimizerAttribute("abstol")) == 2e-5
 end
 
 @testset "Iteration Limit" begin
@@ -90,7 +87,7 @@ end
     MOI.empty!(bridged)
 
     maxit = 1
-    MOI.set(bridged, MOI.RawParameter("maxit"), maxit)
+    MOI.set(bridged, MOI.RawOptimizerAttribute("maxit"), maxit)
     MOI.set(bridged, MOI.Silent(), true)
 
     x = MOI.add_variables(bridged, 3)

@@ -89,7 +89,8 @@ end
 
     MOI.empty!(bridged)
 
-    MOI.set(bridged, MOI.RawParameter("maxit"), 1)
+    maxit = 1
+    MOI.set(bridged, MOI.RawParameter("maxit"), maxit)
     MOI.set(bridged, MOI.Silent(), true)
 
     x = MOI.add_variables(bridged, 3)
@@ -119,4 +120,5 @@ end
     MOI.optimize!(bridged)
 
     @test MOI.get(bridged, MOI.TerminationStatus()) == MOI.ITERATION_LIMIT
+    @test MOI.get(bridged, MOI.BarrierIterations()) == maxit
 end

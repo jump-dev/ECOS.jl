@@ -15,6 +15,7 @@ struct Solution
     dual_objective_value::Float64
     objective_constant::Float64
     solve_time::Float64
+    iter::Int
 end
 # The values used by ECOS are from -7 to 10 so -10 should be safe
 function Solution()
@@ -28,6 +29,7 @@ function Solution()
         NaN,
         NaN,
         NaN,
+        0,
     )
 end
 
@@ -388,6 +390,7 @@ function MOI.optimize!(optimizer::Optimizer)
     ret_val = ECOS.solve(ecos_prob_ptr)
     stat = unsafe_load(unsafe_load(ecos_prob_ptr).info)
     solve_time = stat.tsetup + stat.tsolve
+    iter = stat.iter
     ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
     primal = unsafe_wrap(Array, ecos_prob.x, n)[:]
     dual_eq = unsafe_wrap(Array, ecos_prob.y, cone.f)[:]
@@ -406,10 +409,12 @@ function MOI.optimize!(optimizer::Optimizer)
         dual_objective_value,
         objective_constant,
         solve_time,
+        iter,
     )
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.SolveTime) = optimizer.sol.solve_time
+MOI.get(optimizer::Optimizer, ::MOI.BarrierIterations) = optimizer.sol.iter
 function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
     # Strings from https://github.com/ifa-ethz/ecos/blob/master/include/ecos.h
     flag = optimizer.sol.ret_val

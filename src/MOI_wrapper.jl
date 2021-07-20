@@ -33,6 +33,41 @@ function Solution()
     )
 end
 
+MOIU.@product_of_sets(Zeros, MOI.Zeros)
+MOIU.@product_of_sets(PointedCones, MOI.Nonnegatives, MOI.SecondOrderCone, MOI.ExponentialCone)
+
+MOIU.@struct_of_constraints_by_set_types(
+    ZerosOrNot,
+    MOI.Zeros,
+    Union{MOI.Nonnegatives,MOI.SecondOrderCone,MOI.ExponentialCone},
+)
+
+const OptimizerCache = MOI.Utilities.GenericModel{
+    Cdouble,
+    ZerosOrNot{Cdouble}{
+        MOIU.MatrixOfConstraints{
+            Cdouble,
+            MOIU.MutableSparseMatrixCSC{
+                Cdouble,
+                Clong,
+                MOI.Utilities.ZeroBasedIndexing,
+            },
+            Vector{Cdouble},
+            Zeros{Cdouble},
+        },
+        MOIU.MatrixOfConstraints{
+            T,
+            MOIU.MutableSparseMatrixCSC{
+                Cdouble,
+                Clong,
+                MOI.Utilities.ZeroBasedIndexing,
+            },
+            Vector{Cdouble},
+            PointedCones{Cdouble},
+        },
+    },
+}
+
 # Used to build the data with allocate-load during `copy_to`.
 # When `optimize!` is called, a the data is used to build `ECOSMatrix`
 # and the `ModelData` struct is discarded
@@ -335,6 +370,40 @@ function MOIU.load(
     optimizer.data.objective_constant = f.constant
     optimizer.data.c = optimizer.maxsense ? -c0 : c0
     return nothing
+end
+
+function _copy_to(dest::Optimizer, src::OptimizerCache)
+    @assert MOI.is_empty(dest)
+    Ab = MOI.Utilities.constraints(src.constraints, AFF, MOI.Zeros)
+    A = Ab.coefficients
+    Gh = MOI.Utilities.constraints(src.constraints, AFF, MOI.Nonnegatives)
+    G = Gh.coefficients
+    q = MOI.dimension.(MOI.get.(
+        Gh,
+        MOI.ConstraintSet(),
+        MOI.get(Gh, MOI.ListOfConstraintIndices{AFF,MOI.SecondOrderCone}{})
+    ))
+    obj =
+        MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+    c = zeros(A.n)
+    for term in obj.terms
+        c[term.variable.value] += term.coefficient
+    end
+    dest.inner = setup(
+        A.n,
+        G.m,
+        A.m,
+        Gh.sets.num_rows[2] - Gh.sets.num_rows[1],
+        length(q),
+        q,
+        MOI.get(G, MOI.NumberOfConstraints{AFF,MOI.ExponentialCone})(),
+        ECOSMatrix(-G.nzval, G.colptr, G.rowval),
+        ECOSMatrix(-A.nzval, A.colptr, A.rowval),
+        c,
+        Gh.constants,
+        Ab.constants,
+        kwargs...,
+    )
 end
 
 function MOI.optimize!(optimizer::Optimizer)

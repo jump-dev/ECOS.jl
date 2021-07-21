@@ -77,7 +77,7 @@ end
 # Provide ECOS with a problem in the form
 # min c'x
 # st  A*x = b
-#     G*x in_K h,
+#     G*x ⪯_K h,
 #       or equivalently  h - G*x in K
 #       or equivalently  G*x + s = h, s in K
 # K is the product of R+ and multiple second-order cones, with the

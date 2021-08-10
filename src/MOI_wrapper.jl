@@ -5,6 +5,8 @@ const VI = MOI.VariableIndex
 
 const MOIU = MOI.Utilities
 
+const AFF = MOI.VectorAffineFunction{Float64}
+
 struct Solution
     ret_val::Union{Nothing,Int}
     primal::Vector{Float64}
@@ -13,7 +15,6 @@ struct Solution
     slack::Vector{Float64}
     objective_value::Float64
     dual_objective_value::Float64
-    objective_constant::Float64
     solve_time::Float64
     iter::Int
 end
@@ -28,13 +29,12 @@ function Solution()
         NaN,
         NaN,
         NaN,
-        NaN,
         0,
     )
 end
 
 MOIU.@product_of_sets(Zeros, MOI.Zeros)
-MOIU.@product_of_sets(PointedCones, MOI.Nonnegatives, MOI.SecondOrderCone, MOI.ExponentialCone)
+MOIU.@product_of_sets(Cones, MOI.Nonnegatives, MOI.SecondOrderCone, MOI.ExponentialCone)
 
 MOIU.@struct_of_constraints_by_set_types(
     ZerosOrNot,
@@ -63,21 +63,39 @@ const OptimizerCache = MOI.Utilities.GenericModel{
                 MOI.Utilities.ZeroBasedIndexing,
             },
             Vector{Cdouble},
-            PointedCones{Cdouble},
+            Cones{Cdouble},
         },
     },
 }
 
+
 mutable struct Optimizer <: MOI.AbstractOptimizer
     inner::Union{Nothing,Ptr{Cpwork}}
+    zeros::Union{Nothing,Zeros{Cdouble}}
+    cones::Union{Nothing,Cones{Cdouble}}
+    # Arrays that are not copied by `ECOS_setup` and hence
+    # need to be preserved from being GC'ed between `copy_to`
+    # and `optimize!`
+    gc_preserve::Union{Nothing,Tuple{
+        ECOSMatrix,
+        ECOSMatrix,
+        Vector{Cdouble},
+        Vector{Cdouble},
+        Vector{Cdouble},
+    }}
     maxsense::Bool
+    objective_constant::Float64
     sol::Solution
     silent::Bool
     options::Dict{String,Any}
     function Optimizer(; kwargs...)
         optimizer = new(
             nothing,
+            nothing,
+            nothing,
+            nothing,
             false,
+            NaN,
             Solution(),
             false,
             Dict{String,Any}(),
@@ -93,6 +111,13 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         end
         return optimizer
     end
+end
+
+function _rows(optimizer::Optimizer, ci::MOI.ConstraintIndex{AFF,MOI.Zeros})
+    return MOIU.rows(optimizer.zeros, ci)
+end
+function _rows(optimizer::Optimizer, ci::MOI.ConstraintIndex{AFF})
+    return MOIU.rows(optimizer.cones, ci)
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
@@ -119,12 +144,16 @@ end
 MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
 function MOI.is_empty(optimizer::Optimizer)
-    return !optimizer.maxsense && optimizer.inner === nothing
+    return optimizer.inner === nothing
 end
 
 function MOI.empty!(optimizer::Optimizer)
-    optimizer.maxsense = false
     optimizer.inner = nothing
+    optimizer.zeros = nothing
+    optimizer.cones = nothing
+    optimizer.gc_preserve = nothing
+    optimizer.maxsense = false
+    optimizer.objective_constant = NaN
     optimizer.sol = Solution()
     return
 end
@@ -138,8 +167,6 @@ function MOI.supports(
 )
     return true
 end
-
-const AFF = MOI.VectorAffineFunction{Float64}
 
 function MOI.supports_constraint(
     ::Optimizer,
@@ -168,7 +195,7 @@ function orderidx(idx, s::MOI.ExponentialCone)
 end
 
 function _copy_to(dest::Optimizer, src::OptimizerCache)
-    @assert MOI.is_empty(dest)
+    MOI.empty!(dest)
     Ab = MOI.Utilities.constraints(src.constraints, AFF, MOI.Zeros)
     A = Ab.coefficients
     Gh = MOI.Utilities.constraints(src.constraints, AFF, MOI.Nonnegatives)
@@ -179,27 +206,33 @@ function _copy_to(dest::Optimizer, src::OptimizerCache)
         MOI.get(Gh, MOI.ListOfConstraintIndices{AFF,MOI.SecondOrderCone}())
     ))
     @assert A.n == G.n
+    dest.maxsense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     obj =
         MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+    dest.objective_constant = MOI.constant(obj)
     c0 = zeros(A.n)
     for term in obj.terms
         c0[term.variable.value] += term.coefficient
     end
+    dest.gc_preserve = (
+        ECOSMatrix(-G.nzval, copy(G.colptr), copy(G.rowval)),
+        ECOSMatrix(-A.nzval, copy(A.colptr), copy(A.rowval)),
+        dest.maxsense ? -c0 : c0,
+        copy(Gh.constants),
+        copy(Ab.constants),
+    )
     dest.inner = _setup(
         A.n,
         G.m,
         A.m,
-        Gh.sets.num_rows[2] - Gh.sets.num_rows[1],
+        Gh.sets.num_rows[1],
         length(q),
         q,
         MOI.get(Gh, MOI.NumberOfConstraints{AFF,MOI.ExponentialCone}()),
-        ECOSMatrix(-G.nzval, G.colptr, G.rowval),
-        ECOSMatrix(-A.nzval, A.colptr, A.rowval),
-        dest.maxsense ? -c0 : c0,
-        Gh.constants,
-        Ab.constants;
+        dest.gc_preserve...,
     )
-    dest.maxsense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
+    dest.zeros = deepcopy(Ab.sets) # TODO copy(Ab.sets)
+    dest.cones = deepcopy(Gh.sets) # TODO copy(Gh.sets)
     return
 end
 
@@ -232,24 +265,20 @@ function MOI.copy_to(
 end
 
 function MOI.optimize!(optimizer::Optimizer)
-    if optimizer.data === nothing
-        # optimize! has already been called and no new model has been copied
-        return
-    end
     options = Dict(Symbol(k) => v for (k, v) in optimizer.options)
     if optimizer.silent
         options[:verbose] = false
     end
-    settings(optimizer.inner, dest.options)
+    settings(optimizer.inner, options)
     ret_val = ECOS.solve(optimizer.inner)
     ecos_prob = unsafe_load(optimizer.inner)
     stat = unsafe_load(ecos_prob.info)
     solve_time = stat.tsetup + stat.tsolve
     iter = stat.iter
-    primal = unsafe_wrap(Array, ecos_prob.x, n)[:]
-    dual_eq = unsafe_wrap(Array, ecos_prob.y, cone.f)[:]
-    dual_ineq = unsafe_wrap(Array, ecos_prob.z, m)[:]
-    slack = unsafe_wrap(Array, ecos_prob.s, m)[:]
+    primal = unsafe_wrap(Array, ecos_prob.x, ecos_prob.n)[:]
+    dual_eq = unsafe_wrap(Array, ecos_prob.y, ecos_prob.p)[:]
+    dual_ineq = unsafe_wrap(Array, ecos_prob.z, ecos_prob.m)[:]
+    slack = unsafe_wrap(Array, ecos_prob.s, ecos_prob.m)[:]
     ECOS.cleanup(optimizer.inner, 0)
     objective_value = (optimizer.maxsense ? -1 : 1) * stat.pcost
     dual_objective_value = (optimizer.maxsense ? -1 : 1) * stat.dcost
@@ -261,7 +290,6 @@ function MOI.optimize!(optimizer::Optimizer)
         slack,
         objective_value,
         dual_objective_value,
-        objective_constant,
         solve_time,
         iter,
     )
@@ -335,7 +363,7 @@ function MOI.get(optimizer::Optimizer, attr::MOI.ObjectiveValue)
     MOI.check_result_index_bounds(optimizer, attr)
     value = optimizer.sol.objective_value
     if !MOIU.is_ray(MOI.get(optimizer, MOI.PrimalStatus()))
-        value += optimizer.sol.objective_constant
+        value += optimizer.objective_constant
     end
     return value
 end
@@ -343,7 +371,7 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
     MOI.check_result_index_bounds(optimizer, attr)
     value = optimizer.sol.dual_objective_value
     if !MOIU.is_ray(MOI.get(optimizer, MOI.DualStatus()))
-        value += optimizer.sol.objective_constant
+        value += optimizer.objective_constant
     end
     return value
 end
@@ -386,8 +414,7 @@ function MOI.get(
     ci::CI{<:MOI.AbstractFunction,MOI.Zeros},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    rows = constrrows(optimizer, ci)
-    return zeros(length(rows))
+    return zeros(length(_rows(optimizer, ci)))
 end
 function MOI.get(
     optimizer::Optimizer,
@@ -395,9 +422,7 @@ function MOI.get(
     ci::CI{<:MOI.AbstractFunction,S},
 ) where {S<:MOI.AbstractSet}
     MOI.check_result_index_bounds(optimizer, attr)
-    offset = constroffset(optimizer, ci)
-    rows = constrrows(optimizer, ci)
-    return reorderval(optimizer.sol.slack[offset.+rows], S)
+    return reorderval(optimizer.sol.slack[_rows(optimizer, ci)], S)
 end
 
 function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
@@ -423,19 +448,17 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
         return MOI.OTHER_RESULT_STATUS
     end
 end
-function _dual(optimizer, ci::CI{<:MOI.AbstractFunction,<:MOI.Zeros})
+function _dual(optimizer, ci::CI{AFF,MOI.Zeros})
     return optimizer.sol.dual_eq
 end
 _dual(optimizer, ci::CI) = optimizer.sol.dual_ineq
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
-    ci::CI{<:MOI.AbstractFunction,S},
+    ci::CI{AFF,S},
 ) where {S<:MOI.AbstractSet}
     MOI.check_result_index_bounds(optimizer, attr)
-    offset = constroffset(optimizer, ci)
-    rows = constrrows(optimizer, ci)
-    return reorderval(_dual(optimizer, ci)[offset.+rows], S)
+    return reorderval(_dual(optimizer, ci)[_rows(optimizer, ci)], S)
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1

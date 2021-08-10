@@ -2,7 +2,7 @@ using Test
 
 using MathOptInterface
 const MOI = MathOptInterface
-const MOIT = MOI.Test
+const MOIDT = MOI.DeprecatedTest
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
@@ -14,11 +14,6 @@ MOI.set(optimizer, MOI.Silent(), true)
     @test MOI.get(optimizer, MOI.SolverName()) == "ECOS"
 end
 
-@testset "supports_allocate_load" begin
-    @test MOIU.supports_allocate_load(optimizer, false)
-    @test !MOIU.supports_allocate_load(optimizer, true)
-end
-
 # UniversalFallback is needed for starting values, even if they are ignored by ECOS
 const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 const cached = MOIU.CachingOptimizer(cache, optimizer)
@@ -26,12 +21,12 @@ const cached = MOIU.CachingOptimizer(cache, optimizer)
 const bridged = MOIB.full_bridge_optimizer(cached, Float64)
 
 # SOC2 requires 1e-4
-const config = MOIT.Config(atol = 1e-4, rtol = 1e-4)
+const CONFIG = MOIDT.Config(atol = 1e-4, rtol = 1e-4)
 
 @testset "Unit" begin
-    MOIT.unittest(
+    MOIDT.unittest(
         bridged,
-        config,
+        CONFIG,
         [
             # `NumberOfThreads` not supported.
             "number_threads",
@@ -50,11 +45,11 @@ const config = MOIT.Config(atol = 1e-4, rtol = 1e-4)
 end
 
 @testset "Continuous linear problems" begin
-    MOIT.contlineartest(bridged, config)
+    MOIDT.contlineartest(bridged, CONFIG)
 end
 
 @testset "Continuous quadratic problems" begin
-    MOIT.qcptest(bridged, config)
+    MOIDT.qcptest(bridged, CONFIG)
 end
 
 @testset "Continuous conic problems" begin
@@ -68,7 +63,7 @@ end
         "normnuc",
         "normspec",
     ]
-    MOIT.contconictest(bridged, config, exclude)
+    MOIDT.contconictest(bridged, CONFIG, exclude)
 end
 
 @testset "MOI.RawOptimizerAttribute" begin

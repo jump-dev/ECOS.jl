@@ -265,6 +265,10 @@ function MOI.copy_to(
 end
 
 function MOI.optimize!(optimizer::Optimizer)
+    if optimizer.inner === nothing
+        # ECOS segfault if `ECOS_solve` is called twice on the same `Cpwork`
+        return
+    end
     options = Dict(Symbol(k) => v for (k, v) in optimizer.options)
     if optimizer.silent
         options[:verbose] = false
@@ -293,6 +297,7 @@ function MOI.optimize!(optimizer::Optimizer)
         solve_time,
         iter,
     )
+    optimizer.inner = nothing
     return
 end
 

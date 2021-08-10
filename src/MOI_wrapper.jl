@@ -56,7 +56,7 @@ const OptimizerCache = MOI.Utilities.GenericModel{
             Zeros{Cdouble},
         },
         MOIU.MatrixOfConstraints{
-            T,
+            Cdouble,
             MOIU.MutableSparseMatrixCSC{
                 Cdouble,
                 Clong,
@@ -68,59 +68,16 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     },
 }
 
-# Used to build the data with allocate-load during `copy_to`.
-# When `optimize!` is called, a the data is used to build `ECOSMatrix`
-# and the `ModelData` struct is discarded
-mutable struct ModelData
-    m::Int # Number of rows/constraints
-    n::Int # Number of cols/variables
-    IA::Vector{Int} # List of conic rows
-    JA::Vector{Int} # List of conic cols
-    VA::Vector{Float64} # List of conic coefficients
-    b::Vector{Float64} # List of conic coefficients
-    IG::Vector{Int} # List of equality rows
-    JG::Vector{Int} # List of equality cols
-    VG::Vector{Float64} # List of equality coefficients
-    h::Vector{Float64} # List of equality coefficients
-    objective_constant::Float64 # The objective is min c'x + objective_constant
-    c::Vector{Float64}
-end
-
-# This is tied to ECOS's internal representation
-mutable struct ConeData
-    f::Int # number of linear equality constraints
-    l::Int # length of LP cone
-    q::Int # length of SOC cone
-    qa::Vector{Int} # array of second-order cone constraints
-    ep::Int # number of primal exponential cone triples
-    # The following four field store model information needed to compute `ConstraintPrimal` and `ConstraintDual`
-    eqnrows::Dict{Int,Int}   # The number of rows of Zeros
-    ineqnrows::Dict{Int,Int} # The number of rows of each vector sets except Zeros
-    function ConeData()
-        return new(
-            0,
-            0,
-            0,
-            Int[],
-            0,
-            Dict{Int,UnitRange{Int}}(),
-            Dict{Int,UnitRange{Int}}(),
-        )
-    end
-end
-
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    cone::ConeData
+    inner::Union{Nothing,Ptr{Cpwork}}
     maxsense::Bool
-    data::Union{Nothing,ModelData} # only non-Nothing between MOI.copy_to and MOI.optimize!
     sol::Solution
     silent::Bool
     options::Dict{String,Any}
     function Optimizer(; kwargs...)
         optimizer = new(
-            ConeData(),
-            false,
             nothing,
+            false,
             Solution(),
             false,
             Dict{String,Any}(),
@@ -140,6 +97,10 @@ end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
 
+function MOI.supports(::Optimizer, param::MOI.RawOptimizerAttribute)
+    return hasfield(Csettings, Symbol(param.name))
+end
+
 function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
     optimizer.options[param.name] = value
     return
@@ -158,16 +119,15 @@ end
 MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
 function MOI.is_empty(optimizer::Optimizer)
-    return !optimizer.maxsense && optimizer.data === nothing
+    return !optimizer.maxsense && optimizer.inner === nothing
 end
 
 function MOI.empty!(optimizer::Optimizer)
     optimizer.maxsense = false
-    optimizer.data = nothing # It should already be nothing except if an error is thrown inside copy_to
-    return optimizer.sol = Solution()
+    optimizer.inner = nothing
+    optimizer.sol = Solution()
+    return
 end
-
-MOIU.supports_allocate_load(::Optimizer, copy_names::Bool) = !copy_names
 
 function MOI.supports(
     ::Optimizer,
@@ -179,9 +139,11 @@ function MOI.supports(
     return true
 end
 
+const AFF = MOI.VectorAffineFunction{Float64}
+
 function MOI.supports_constraint(
     ::Optimizer,
-    ::Type{MOI.VectorAffineFunction{Float64}},
+    ::Type{AFF},
     ::Type{
         <:Union{
             MOI.Zeros,
@@ -194,95 +156,6 @@ function MOI.supports_constraint(
     return true
 end
 
-function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kws...)
-    return MOIU.automatic_copy_to(dest, src; kws...)
-end
-
-using SparseArrays
-
-# Computes cone dimensions
-function constroffset(cone::ConeData, ci::CI{<:MOI.AbstractFunction,MOI.Zeros})
-    return ci.value
-end
-function _allocate_constraint(cone::ConeData, f, s::MOI.Zeros)
-    ci = cone.f
-    cone.f += MOI.dimension(s)
-    return ci
-end
-function constroffset(
-    cone::ConeData,
-    ci::CI{<:MOI.AbstractFunction,MOI.Nonnegatives},
-)
-    return ci.value
-end
-function _allocate_constraint(cone::ConeData, f, s::MOI.Nonnegatives)
-    ci = cone.l
-    cone.l += MOI.dimension(s)
-    return ci
-end
-function constroffset(
-    cone::ConeData,
-    ci::CI{<:MOI.AbstractFunction,<:MOI.SecondOrderCone},
-)
-    return cone.l + ci.value
-end
-function _allocate_constraint(cone::ConeData, f, s::MOI.SecondOrderCone)
-    push!(cone.qa, s.dimension)
-    ci = cone.q
-    cone.q += MOI.dimension(s)
-    return ci
-end
-function constroffset(
-    cone::ConeData,
-    ci::CI{<:MOI.AbstractFunction,<:MOI.ExponentialCone},
-)
-    return cone.l + cone.q + ci.value
-end
-function _allocate_constraint(cone::ConeData, f, s::MOI.ExponentialCone)
-    ci = 3cone.ep
-    cone.ep += 1
-    return ci
-end
-function constroffset(optimizer::Optimizer, ci::CI)
-    return constroffset(optimizer.cone, ci::CI)
-end
-function MOIU.allocate_constraint(
-    optimizer::Optimizer,
-    f::F,
-    s::S,
-) where {F<:MOI.AbstractFunction,S<:MOI.AbstractSet}
-    return CI{F,S}(_allocate_constraint(optimizer.cone, f, s))
-end
-
-# Build constraint matrix
-output_index(t::MOI.VectorAffineTerm) = t.output_index
-variable_index_value(t::MOI.ScalarAffineTerm) = t.variable.value
-function variable_index_value(t::MOI.VectorAffineTerm)
-    return variable_index_value(t.scalar_term)
-end
-coefficient(t::MOI.ScalarAffineTerm) = t.coefficient
-coefficient(t::MOI.VectorAffineTerm) = coefficient(t.scalar_term)
-constrrows(s::MOI.AbstractVectorSet) = 1:MOI.dimension(s)
-function constrrows(
-    optimizer::Optimizer,
-    ci::CI{<:MOI.AbstractVectorFunction,MOI.Zeros},
-)
-    return 1:optimizer.cone.eqnrows[constroffset(optimizer, ci)]
-end
-function constrrows(
-    optimizer::Optimizer,
-    ci::CI{<:MOI.AbstractVectorFunction,<:MOI.AbstractVectorSet},
-)
-    return 1:optimizer.cone.ineqnrows[constroffset(optimizer, ci)]
-end
-matrix(data::ModelData, s::MOI.Zeros) = data.b, data.IA, data.JA, data.VA
-function matrix(
-    data::ModelData,
-    s::Union{MOI.Nonnegatives,MOI.SecondOrderCone,MOI.ExponentialCone},
-)
-    return data.h, data.IG, data.JG, data.VG
-end
-matrix(optimizer::Optimizer, s) = matrix(optimizer.data, s)
 # ECOS orders differently than MOI the second and third dimension of the exponential cone
 orderval(val, s) = val
 function orderval(val, s::Union{MOI.ExponentialCone,Type{MOI.ExponentialCone}})
@@ -292,84 +165,6 @@ orderidx(idx, s) = idx
 expmap(i) = (1, 3, 2)[i]
 function orderidx(idx, s::MOI.ExponentialCone)
     return expmap.(idx)
-end
-function MOIU.load_constraint(
-    optimizer::Optimizer,
-    ci::MOI.ConstraintIndex,
-    f::MOI.VectorAffineFunction,
-    s::MOI.AbstractVectorSet,
-)
-    func = MOIU.canonical(f)
-    I = Int[output_index(term) for term in func.terms]
-    J = Int[variable_index_value(term) for term in func.terms]
-    V = Float64[-coefficient(term) for term in func.terms]
-    offset = constroffset(optimizer, ci)
-    rows = constrrows(s)
-    if s isa MOI.Zeros
-        optimizer.cone.eqnrows[offset] = length(rows)
-    else
-        optimizer.cone.ineqnrows[offset] = length(rows)
-    end
-    i = offset .+ rows
-    # The ECOS format is b - Ax ∈ cone
-    # so minus=false for b and minus=true for A
-    b, Is, Js, Vs = matrix(optimizer, s)
-    b[i] .= orderval(f.constants, s)
-    append!(Is, offset .+ orderidx(I, s))
-    append!(Js, J)
-    return append!(Vs, V)
-end
-
-function MOIU.allocate_variables(optimizer::Optimizer, nvars::Integer)
-    optimizer.cone = ConeData()
-    return VI.(1:nvars)
-end
-
-function MOIU.load_variables(optimizer::Optimizer, nvars::Integer)
-    cone = optimizer.cone
-    m = cone.l + cone.q + 3cone.ep
-    IA = Int[]
-    JA = Int[]
-    VA = Float64[]
-    b = zeros(cone.f)
-    IG = Int[]
-    JG = Int[]
-    VG = Float64[]
-    h = zeros(m)
-    c = zeros(nvars)
-    return optimizer.data =
-        ModelData(m, nvars, IA, JA, VA, b, IG, JG, VG, h, 0.0, c)
-end
-
-function MOIU.allocate(
-    optimizer::Optimizer,
-    ::MOI.ObjectiveSense,
-    sense::MOI.OptimizationSense,
-)
-    return optimizer.maxsense = sense == MOI.MAX_SENSE
-end
-function MOIU.allocate(
-    ::Optimizer,
-    ::MOI.ObjectiveFunction,
-    ::MOI.ScalarAffineFunction{Float64},
-) end
-
-function MOIU.load(::Optimizer, ::MOI.ObjectiveSense, ::MOI.OptimizationSense) end
-function MOIU.load(
-    optimizer::Optimizer,
-    ::MOI.ObjectiveFunction,
-    f::MOI.ScalarAffineFunction,
-)
-    c0 = Vector(
-        sparsevec(
-            variable_index_value.(f.terms),
-            coefficient.(f.terms),
-            optimizer.data.n,
-        ),
-    )
-    optimizer.data.objective_constant = f.constant
-    optimizer.data.c = optimizer.maxsense ? -c0 : c0
-    return nothing
 end
 
 function _copy_to(dest::Optimizer, src::OptimizerCache)
@@ -381,29 +176,59 @@ function _copy_to(dest::Optimizer, src::OptimizerCache)
     q = MOI.dimension.(MOI.get.(
         Gh,
         MOI.ConstraintSet(),
-        MOI.get(Gh, MOI.ListOfConstraintIndices{AFF,MOI.SecondOrderCone}{})
+        MOI.get(Gh, MOI.ListOfConstraintIndices{AFF,MOI.SecondOrderCone}())
     ))
+    @assert A.n == G.n
     obj =
         MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-    c = zeros(A.n)
+    c0 = zeros(A.n)
     for term in obj.terms
-        c[term.variable.value] += term.coefficient
+        c0[term.variable.value] += term.coefficient
     end
-    dest.inner = setup(
+    dest.inner = _setup(
         A.n,
         G.m,
         A.m,
         Gh.sets.num_rows[2] - Gh.sets.num_rows[1],
         length(q),
         q,
-        MOI.get(G, MOI.NumberOfConstraints{AFF,MOI.ExponentialCone})(),
+        MOI.get(Gh, MOI.NumberOfConstraints{AFF,MOI.ExponentialCone}()),
         ECOSMatrix(-G.nzval, G.colptr, G.rowval),
         ECOSMatrix(-A.nzval, A.colptr, A.rowval),
-        c,
+        dest.maxsense ? -c0 : c0,
         Gh.constants,
-        Ab.constants,
-        kwargs...,
+        Ab.constants;
     )
+    dest.maxsense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
+    return
+end
+
+function MOI.copy_to(
+    dest::Optimizer,
+    src::OptimizerCache;
+    copy_names::Bool = false,
+)
+    _copy_to(dest, src)
+    return MOIU.identity_index_map(src)
+end
+
+function MOI.copy_to(
+    dest::Optimizer,
+    src::MOI.Utilities.UniversalFallback{OptimizerCache};
+    copy_names::Bool = false,
+)
+    return MOI.copy_to(dest, src.model)
+end
+
+function MOI.copy_to(
+    dest::Optimizer,
+    src::MOI.ModelLike;
+    copy_names::Bool = false,
+)
+    cache = OptimizerCache()
+    index_map = MOI.copy_to(cache, src)
+    _copy_to(dest, cache)
+    return index_map
 end
 
 function MOI.optimize!(optimizer::Optimizer)
@@ -411,58 +236,24 @@ function MOI.optimize!(optimizer::Optimizer)
         # optimize! has already been called and no new model has been copied
         return
     end
-    cone = optimizer.cone
-    m = optimizer.data.m
-    n = optimizer.data.n
-    A = ECOS.ECOSMatrix(
-        sparse(
-            optimizer.data.IA,
-            optimizer.data.JA,
-            optimizer.data.VA,
-            cone.f,
-            n,
-        ),
-    )
-    b = optimizer.data.b
-    G = ECOS.ECOSMatrix(
-        sparse(optimizer.data.IG, optimizer.data.JG, optimizer.data.VG, m, n),
-    )
-    h = optimizer.data.h
-    objective_constant = optimizer.data.objective_constant
-    c = optimizer.data.c
-    optimizer.data = nothing # Allows GC to free optimizer.data before A is loaded to ECOS
     options = Dict(Symbol(k) => v for (k, v) in optimizer.options)
     if optimizer.silent
         options[:verbose] = false
     end
-    ecos_prob_ptr = ECOS.setup(
-        n,
-        m,
-        cone.f,
-        cone.l,
-        length(cone.qa),
-        cone.qa,
-        cone.ep,
-        G,
-        A,
-        c,
-        h,
-        b;
-        options...,
-    )
-    ret_val = ECOS.solve(ecos_prob_ptr)
-    stat = unsafe_load(unsafe_load(ecos_prob_ptr).info)
+    settings(optimizer.inner, dest.options)
+    ret_val = ECOS.solve(optimizer.inner)
+    ecos_prob = unsafe_load(optimizer.inner)
+    stat = unsafe_load(ecos_prob.info)
     solve_time = stat.tsetup + stat.tsolve
     iter = stat.iter
-    ecos_prob = unsafe_wrap(Array, ecos_prob_ptr, 1)[1]
     primal = unsafe_wrap(Array, ecos_prob.x, n)[:]
     dual_eq = unsafe_wrap(Array, ecos_prob.y, cone.f)[:]
     dual_ineq = unsafe_wrap(Array, ecos_prob.z, m)[:]
     slack = unsafe_wrap(Array, ecos_prob.s, m)[:]
-    ECOS.cleanup(ecos_prob_ptr, 0)
+    ECOS.cleanup(optimizer.inner, 0)
     objective_value = (optimizer.maxsense ? -1 : 1) * stat.pcost
     dual_objective_value = (optimizer.maxsense ? -1 : 1) * stat.dcost
-    return optimizer.sol = Solution(
+    optimizer.sol = Solution(
         ret_val,
         primal,
         dual_eq,
@@ -474,6 +265,7 @@ function MOI.optimize!(optimizer::Optimizer)
         solve_time,
         iter,
     )
+    return
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.SolveTimeSec) = optimizer.sol.solve_time

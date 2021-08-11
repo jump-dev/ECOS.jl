@@ -226,6 +226,11 @@ function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
 end
 
 include("MPB_wrapper.jl")
+
+using MathOptInterface
+const MOI = MathOptInterface
+
+include("exp_bridge.jl")
 include("MOI_wrapper.jl")
 
 end # module

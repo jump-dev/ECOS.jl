@@ -1,8 +1,3 @@
-using MathOptInterface
-const MOI = MathOptInterface
-const CI = MOI.ConstraintIndex
-const VI = MOI.VariableIndex
-
 const MOIU = MOI.Utilities
 
 const AFF = MOI.VectorAffineFunction{Float64}
@@ -34,12 +29,17 @@ function Solution()
 end
 
 MOIU.@product_of_sets(Zeros, MOI.Zeros)
-MOIU.@product_of_sets(Cones, MOI.Nonnegatives, MOI.SecondOrderCone, MOI.ExponentialCone)
+MOIU.@product_of_sets(
+    Cones,
+    MOI.Nonnegatives,
+    MOI.SecondOrderCone,
+    PermutedExponentialCone
+)
 
 MOIU.@struct_of_constraints_by_set_types(
     ZerosOrNot,
     MOI.Zeros,
-    Union{MOI.Nonnegatives,MOI.SecondOrderCone,MOI.ExponentialCone},
+    Union{MOI.Nonnegatives,MOI.SecondOrderCone,PermutedExponentialCone},
 )
 
 const OptimizerCache = MOI.Utilities.GenericModel{
@@ -68,7 +68,6 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     },
 }
 
-
 mutable struct Optimizer <: MOI.AbstractOptimizer
     inner::Union{Nothing,Ptr{Cpwork}}
     zeros::Union{Nothing,Zeros{Cdouble}}
@@ -76,13 +75,16 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # Arrays that are not copied by `ECOS_setup` and hence
     # need to be preserved from being GC'ed between `copy_to`
     # and `optimize!`
-    gc_preserve::Union{Nothing,Tuple{
-        ECOSMatrix,
-        ECOSMatrix,
-        Vector{Cdouble},
-        Vector{Cdouble},
-        Vector{Cdouble},
-    }}
+    gc_preserve::Union{
+        Nothing,
+        Tuple{
+            ECOSMatrix,
+            ECOSMatrix,
+            Vector{Cdouble},
+            Vector{Cdouble},
+            Vector{Cdouble},
+        },
+    }
     maxsense::Bool
     objective_constant::Float64
     sol::Solution
@@ -176,22 +178,11 @@ function MOI.supports_constraint(
             MOI.Zeros,
             MOI.Nonnegatives,
             MOI.SecondOrderCone,
-            MOI.ExponentialCone,
+            PermutedExponentialCone,
         },
     },
 )
     return true
-end
-
-# ECOS orders differently than MOI the second and third dimension of the exponential cone
-orderval(val, s) = val
-function orderval(val, s::Union{MOI.ExponentialCone,Type{MOI.ExponentialCone}})
-    return val[[1, 3, 2]]
-end
-orderidx(idx, s) = idx
-expmap(i) = (1, 3, 2)[i]
-function orderidx(idx, s::MOI.ExponentialCone)
-    return expmap.(idx)
 end
 
 function _copy_to(dest::Optimizer, src::OptimizerCache)
@@ -200,11 +191,17 @@ function _copy_to(dest::Optimizer, src::OptimizerCache)
     A = Ab.coefficients
     Gh = MOI.Utilities.constraints(src.constraints, AFF, MOI.Nonnegatives)
     G = Gh.coefficients
-    q = MOI.dimension.(MOI.get.(
-        Gh,
-        MOI.ConstraintSet(),
-        MOI.get(Gh, MOI.ListOfConstraintIndices{AFF,MOI.SecondOrderCone}())
-    ))
+    q =
+        MOI.dimension.(
+            MOI.get.(
+                Gh,
+                MOI.ConstraintSet(),
+                MOI.get(
+                    Gh,
+                    MOI.ListOfConstraintIndices{AFF,MOI.SecondOrderCone}(),
+                ),
+            ),
+        )
     @assert A.n == G.n
     dest.maxsense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     obj =
@@ -228,7 +225,7 @@ function _copy_to(dest::Optimizer, src::OptimizerCache)
         Gh.sets.num_rows[1],
         length(q),
         q,
-        MOI.get(Gh, MOI.NumberOfConstraints{AFF,MOI.ExponentialCone}()),
+        MOI.get(Gh, MOI.NumberOfConstraints{AFF,PermutedExponentialCone}()),
         dest.gc_preserve...,
     )
     dest.zeros = deepcopy(Ab.sets) # TODO copy(Ab.sets)
@@ -243,14 +240,6 @@ function MOI.copy_to(
 )
     _copy_to(dest, src)
     return MOIU.identity_index_map(src)
-end
-
-function MOI.copy_to(
-    dest::Optimizer,
-    src::MOI.Utilities.UniversalFallback{OptimizerCache};
-    copy_names::Bool = false,
-)
-    return MOI.copy_to(dest, src.model)
 end
 
 function MOI.copy_to(
@@ -404,19 +393,18 @@ function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
         return MOI.OTHER_RESULT_STATUS
     end
 end
-# Swapping indices 2 <-> 3 is an involution (it is its own inverse)
-const reorderval = orderval
-function MOI.get(optimizer::Optimizer, attr::MOI.VariablePrimal, vi::VI)
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.VariablePrimal,
+    vi::MOI.VariableIndex,
+)
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.primal[vi.value]
-end
-function MOI.get(optimizer::Optimizer, a::MOI.VariablePrimal, vi::Vector{VI})
-    return MOI.get.(optimizer, Ref(a), vi)
 end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
-    ci::CI{<:MOI.AbstractFunction,MOI.Zeros},
+    ci::MOI.ConstraintIndex{AFF,MOI.Zeros},
 )
     MOI.check_result_index_bounds(optimizer, attr)
     return zeros(length(_rows(optimizer, ci)))
@@ -424,10 +412,10 @@ end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
-    ci::CI{<:MOI.AbstractFunction,S},
-) where {S<:MOI.AbstractSet}
+    ci::MOI.ConstraintIndex,
+)
     MOI.check_result_index_bounds(optimizer, attr)
-    return reorderval(optimizer.sol.slack[_rows(optimizer, ci)], S)
+    return optimizer.sol.slack[_rows(optimizer, ci)]
 end
 
 function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
@@ -453,17 +441,17 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
         return MOI.OTHER_RESULT_STATUS
     end
 end
-function _dual(optimizer, ci::CI{AFF,MOI.Zeros})
+function _dual(optimizer, ci::MOI.ConstraintIndex{AFF,MOI.Zeros})
     return optimizer.sol.dual_eq
 end
-_dual(optimizer, ci::CI) = optimizer.sol.dual_ineq
+_dual(optimizer, ci::MOI.ConstraintIndex) = optimizer.sol.dual_ineq
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
-    ci::CI{AFF,S},
-) where {S<:MOI.AbstractSet}
+    ci::MOI.ConstraintIndex{AFF},
+)
     MOI.check_result_index_bounds(optimizer, attr)
-    return reorderval(_dual(optimizer, ci)[_rows(optimizer, ci)], S)
+    return _dual(optimizer, ci)[_rows(optimizer, ci)]
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1

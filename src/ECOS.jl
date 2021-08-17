@@ -206,23 +206,20 @@ end
 # but currently there is no convenient interface-provided way to access
 # this - use MathProgBase interface.
 function solve(problem::Ptr{Cpwork})
-    exitflag =
-        ccall((:ECOS_solve, ECOS.ecos), Clong, (Ptr{Cpwork},), problem)
-    return exitflag
+    return ccall((:ECOS_solve, ECOS.ecos), Clong, (Ptr{Cpwork},), problem)
 end
 
 # cleanup
 # Frees memory allocated by ECOS for the problem.
 # The optional keepvars argument is number of variables to NOT free.
 function cleanup(problem::Ptr{Cpwork}, keepvars::Int = 0)
-    ccall(
+    return ccall(
         (:ECOS_cleanup, ECOS.ecos),
         Cvoid,
         (Ptr{Cpwork}, Clong),
         problem,
         keepvars,
     )
-    return
 end
 
 include("MPB_wrapper.jl")

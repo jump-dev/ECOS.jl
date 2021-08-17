@@ -19,7 +19,6 @@ const cache = MOIU.UniversalFallback(MOIU.Model{Float64}())
 const cached = MOIU.CachingOptimizer(cache, optimizer)
 
 const bridged = MOIB.full_bridge_optimizer(cached, Float64)
-MOIB.add_bridge(bridged, ECOS.PermutedExponentialBridge{Float64})
 
 # SOC2 requires 1e-4
 const CONFIG = MOIDT.Config(atol = 1e-4, rtol = 1e-4)

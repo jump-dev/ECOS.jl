@@ -2,7 +2,7 @@ const MOIU = MOI.Utilities
 
 const AFF = MOI.VectorAffineFunction{Float64}
 
-struct Solution
+mutable struct Solution
     ret_val::Union{Nothing,Int}
     primal::Vector{Float64}
     dual_eq::Vector{Float64}
@@ -44,6 +44,8 @@ MOIU.@struct_of_constraints_by_set_types(
 
 const OptimizerCache = MOI.Utilities.GenericModel{
     Cdouble,
+    MOIU.ObjectiveContainer{Cdouble},
+    MOIU.VariablesContainer{Cdouble},
     ZerosOrNot{Cdouble}{
         MOIU.MatrixOfConstraints{
             Cdouble,
@@ -69,39 +71,13 @@ const OptimizerCache = MOI.Utilities.GenericModel{
 }
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    inner::Union{Nothing,Ptr{Cpwork}}
     zeros::Union{Nothing,Zeros{Cdouble}}
     cones::Union{Nothing,Cones{Cdouble}}
-    # Arrays that are not copied by `ECOS_setup` and hence
-    # need to be preserved from being GC'ed between `copy_to`
-    # and `optimize!`
-    gc_preserve::Union{
-        Nothing,
-        Tuple{
-            ECOSMatrix,
-            ECOSMatrix,
-            Vector{Cdouble},
-            Vector{Cdouble},
-            Vector{Cdouble},
-        },
-    }
-    maxsense::Bool
-    objective_constant::Float64
     sol::Solution
     silent::Bool
     options::Dict{String,Any}
     function Optimizer(; kwargs...)
-        optimizer = new(
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            false,
-            NaN,
-            Solution(),
-            false,
-            Dict{String,Any}(),
-        )
+        optimizer = new(nothing, nothing, Solution(), false, Dict{String,Any}())
         if length(kwargs) > 0
             @warn(
                 "Passing keyword attributes is deprecated. Use " *
@@ -113,6 +89,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         end
         return optimizer
     end
+end
+
+function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
+    return [PermutedExponentialBridge{Cdouble}]
 end
 
 function _rows(optimizer::Optimizer, ci::MOI.ConstraintIndex{AFF,MOI.Zeros})
@@ -146,16 +126,12 @@ end
 MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
 function MOI.is_empty(optimizer::Optimizer)
-    return optimizer.inner === nothing
+    return optimizer.zeros === nothing && optimizer.cones === nothing
 end
 
 function MOI.empty!(optimizer::Optimizer)
-    optimizer.inner = nothing
     optimizer.zeros = nothing
     optimizer.cones = nothing
-    optimizer.gc_preserve = nothing
-    optimizer.maxsense = false
-    optimizer.objective_constant = NaN
     optimizer.sol = Solution()
     return
 end
@@ -185,7 +161,7 @@ function MOI.supports_constraint(
     return true
 end
 
-function _copy_to(dest::Optimizer, src::OptimizerCache)
+function _copy_to_and_optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     Ab = MOI.Utilities.constraints(src.constraints, AFF, MOI.Zeros)
     A = Ab.coefficients
@@ -203,22 +179,24 @@ function _copy_to(dest::Optimizer, src::OptimizerCache)
             ),
         )
     @assert A.n == G.n
-    dest.maxsense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
+    max_sense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     obj =
         MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-    dest.objective_constant = MOI.constant(obj)
+    objective_constant = MOI.constant(obj)
     c0 = zeros(A.n)
     for term in obj.terms
         c0[term.variable.value] += term.coefficient
     end
-    dest.gc_preserve = (
-        ECOSMatrix(-G.nzval, copy(G.colptr), copy(G.rowval)),
-        ECOSMatrix(-A.nzval, copy(A.colptr), copy(A.rowval)),
-        dest.maxsense ? -c0 : c0,
-        copy(Gh.constants),
-        copy(Ab.constants),
-    )
-    dest.inner = _setup(
+
+    dest.zeros = deepcopy(Ab.sets) # TODO copy(Ab.sets)
+    dest.cones = deepcopy(Gh.sets) # TODO copy(Gh.sets)
+
+    options = Dict(Symbol(k) => v for (k, v) in dest.options)
+    if dest.silent
+        options[:verbose] = false
+    end
+
+    inner = _setup(
         A.n,
         G.m,
         A.m,
@@ -226,45 +204,15 @@ function _copy_to(dest::Optimizer, src::OptimizerCache)
         length(q),
         q,
         MOI.get(Gh, MOI.NumberOfConstraints{AFF,PermutedExponentialCone}()),
-        dest.gc_preserve...,
+        ECOSMatrix(-G.nzval, G.colptr, G.rowval),
+        ECOSMatrix(-A.nzval, A.colptr, A.rowval),
+        max_sense ? -c0 : c0,
+        Gh.constants,
+        Ab.constants,
     )
-    dest.zeros = deepcopy(Ab.sets) # TODO copy(Ab.sets)
-    dest.cones = deepcopy(Gh.sets) # TODO copy(Gh.sets)
-    return
-end
-
-function MOI.copy_to(
-    dest::Optimizer,
-    src::OptimizerCache;
-    copy_names::Bool = false,
-)
-    _copy_to(dest, src)
-    return MOIU.identity_index_map(src)
-end
-
-function MOI.copy_to(
-    dest::Optimizer,
-    src::MOI.ModelLike;
-    copy_names::Bool = false,
-)
-    cache = OptimizerCache()
-    index_map = MOI.copy_to(cache, src)
-    _copy_to(dest, cache)
-    return index_map
-end
-
-function MOI.optimize!(optimizer::Optimizer)
-    if optimizer.inner === nothing
-        # ECOS segfault if `ECOS_solve` is called twice on the same `Cpwork`
-        return
-    end
-    options = Dict(Symbol(k) => v for (k, v) in optimizer.options)
-    if optimizer.silent
-        options[:verbose] = false
-    end
-    settings(optimizer.inner, options)
-    ret_val = ECOS.solve(optimizer.inner)
-    ecos_prob = unsafe_load(optimizer.inner)
+    settings(inner, options)
+    ret_val = ECOS.solve(inner)
+    ecos_prob = unsafe_load(inner)
     stat = unsafe_load(ecos_prob.info)
     solve_time = stat.tsetup + stat.tsolve
     iter = stat.iter
@@ -272,10 +220,10 @@ function MOI.optimize!(optimizer::Optimizer)
     dual_eq = unsafe_wrap(Array, ecos_prob.y, ecos_prob.p)[:]
     dual_ineq = unsafe_wrap(Array, ecos_prob.z, ecos_prob.m)[:]
     slack = unsafe_wrap(Array, ecos_prob.s, ecos_prob.m)[:]
-    ECOS.cleanup(optimizer.inner, 0)
-    objective_value = (optimizer.maxsense ? -1 : 1) * stat.pcost
-    dual_objective_value = (optimizer.maxsense ? -1 : 1) * stat.dcost
-    optimizer.sol = Solution(
+    ECOS.cleanup(inner, 0)
+    objective_value = (max_sense ? -1 : 1) * stat.pcost
+    dual_objective_value = (max_sense ? -1 : 1) * stat.dcost
+    dest.sol = Solution(
         ret_val,
         primal,
         dual_eq,
@@ -286,9 +234,37 @@ function MOI.optimize!(optimizer::Optimizer)
         solve_time,
         iter,
     )
-    optimizer.inner = nothing
+    if !MOIU.is_ray(MOI.get(dest, MOI.PrimalStatus()))
+        dest.sol.objective_value += objective_constant
+    end
+    if !MOIU.is_ray(MOI.get(dest, MOI.DualStatus()))
+        dest.sol.dual_objective_value += objective_constant
+    end
     return
 end
+
+function MOI.copy_to_and_optimize!(
+    dest::Optimizer,
+    src::OptimizerCache;
+    copy_names::Bool = false,
+)
+    _copy_to_and_optimize!(dest, src)
+    return MOIU.identity_index_map(src)
+end
+
+function MOI.copy_to_and_optimize!(
+    dest::Optimizer,
+    src::MOI.ModelLike;
+    copy_names::Bool = false,
+)
+    cache = OptimizerCache()
+    index_map = MOI.copy_to(cache, src)
+    _copy_to_and_optimize!(dest, cache)
+    return index_map
+end
+
+# ECOS segfault if `ECOS_solve` is called twice on the same `Cpwork`
+function MOI.optimize!(optimizer::Optimizer) end
 
 MOI.get(optimizer::Optimizer, ::MOI.SolveTimeSec) = optimizer.sol.solve_time
 MOI.get(optimizer::Optimizer, ::MOI.BarrierIterations) = optimizer.sol.iter
@@ -355,19 +331,11 @@ end
 
 function MOI.get(optimizer::Optimizer, attr::MOI.ObjectiveValue)
     MOI.check_result_index_bounds(optimizer, attr)
-    value = optimizer.sol.objective_value
-    if !MOIU.is_ray(MOI.get(optimizer, MOI.PrimalStatus()))
-        value += optimizer.objective_constant
-    end
-    return value
+    return optimizer.sol.objective_value
 end
 function MOI.get(optimizer::Optimizer, attr::MOI.DualObjectiveValue)
     MOI.check_result_index_bounds(optimizer, attr)
-    value = optimizer.sol.dual_objective_value
-    if !MOIU.is_ray(MOI.get(optimizer, MOI.DualStatus()))
-        value += optimizer.objective_constant
-    end
-    return value
+    return optimizer.sol.dual_objective_value
 end
 
 function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)

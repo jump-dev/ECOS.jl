@@ -171,20 +171,18 @@ end
 function settings(problem_ptr, options)
     problem = unsafe_load(problem_ptr)
     problem.stgs != C_NULL ||
-    error("ECOS returned a malformed settings struct.")
+        error("ECOS returned a malformed settings struct.")
     settings = unsafe_load(problem.stgs)
     new_settings = Csettings(
         [
             setting in keys(options) ?
-            convert(
-                fieldtype(typeof(settings), setting),
-                options[setting],
-            ) : getfield(settings, setting) for
+            convert(fieldtype(typeof(settings), setting), options[setting]) : getfield(settings, setting) for
             setting in fieldnames(typeof(settings))
         ]...,
     )
 
     unsafe_store!(problem.stgs, new_settings)
+    return
 end
 
 function setup(args...; kwargs...)

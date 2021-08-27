@@ -267,7 +267,9 @@ end
 function MOI.optimize!(optimizer::Optimizer) end
 
 MOI.get(optimizer::Optimizer, ::MOI.SolveTimeSec) = optimizer.sol.solve_time
-MOI.get(optimizer::Optimizer, ::MOI.BarrierIterations) = optimizer.sol.iter
+function MOI.get(optimizer::Optimizer, ::MOI.BarrierIterations)
+    return Int64(optimizer.sol.iter)
+end
 function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
     # Strings from https://github.com/ifa-ethz/ecos/blob/master/include/ecos.h
     flag = optimizer.sol.ret_val

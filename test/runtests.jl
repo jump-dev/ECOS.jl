@@ -7,11 +7,6 @@
 # Test the ECOS.jl solver wrapper
 #############################################################################
 
-if get(ENV, "GITHUB_ACTIONS", "") == "true"
-    import Pkg
-    Pkg.add(Pkg.PackageSpec(name = "MathOptInterface", rev = "master"))
-end
-
 using ECOS
 
 using Test

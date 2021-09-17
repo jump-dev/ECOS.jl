@@ -161,7 +161,7 @@ function MOI.supports_constraint(
     return true
 end
 
-function _copy_to_and_optimize!(dest::Optimizer, src::OptimizerCache)
+function _optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     Ab = MOI.Utilities.constraints(src.constraints, AFF, MOI.Zeros)
     A = Ab.coefficients
@@ -243,23 +243,15 @@ function _copy_to_and_optimize!(dest::Optimizer, src::OptimizerCache)
     return
 end
 
-function MOI.copy_to_and_optimize!(
-    dest::Optimizer,
-    src::OptimizerCache;
-    copy_names::Bool = false,
-)
-    _copy_to_and_optimize!(dest, src)
-    return MOIU.identity_index_map(src)
+function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
+    _optimize!(dest, src)
+    return MOIU.identity_index_map(src), false
 end
 
-function MOI.copy_to_and_optimize!(
-    dest::Optimizer,
-    src::MOI.ModelLike;
-    copy_names::Bool = false,
-)
+function MOI.optimize!(dest::Optimizer, src::MOI.ModelLike)
     cache = OptimizerCache()
     index_map = MOI.copy_to(cache, src)
-    _copy_to_and_optimize!(dest, cache)
+    _optimize!(dest, cache)
     return index_map
 end
 

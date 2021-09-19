@@ -63,7 +63,6 @@ function test_iteration_limit()
     v = [5.0, 3.0, 1.0]
     w = [2.0, 1.5, 0.3]
 
-
     solver = MOI.OptimizerWithAttributes(ECOS.Optimizer, MOI.Silent() => true)
     model = MOI.instantiate(solver, with_bridge_type = Float64)
 

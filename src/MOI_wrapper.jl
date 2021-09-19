@@ -252,11 +252,8 @@ function MOI.optimize!(dest::Optimizer, src::MOI.ModelLike)
     cache = OptimizerCache()
     index_map = MOI.copy_to(cache, src)
     _optimize!(dest, cache)
-    return index_map
+    return index_map, false
 end
-
-# ECOS segfault if `ECOS_solve` is called twice on the same `Cpwork`
-function MOI.optimize!(optimizer::Optimizer) end
 
 MOI.get(optimizer::Optimizer, ::MOI.SolveTimeSec) = optimizer.sol.solve_time
 function MOI.get(optimizer::Optimizer, ::MOI.BarrierIterations)

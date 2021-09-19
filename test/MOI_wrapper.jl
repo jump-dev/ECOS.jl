@@ -19,7 +19,7 @@ end
 
 function test_runtests()
     solver = MOI.OptimizerWithAttributes(ECOS.Optimizer, MOI.Silent() => true)
-    model = MOI.instantiate(solver, with_bridge_type=Float64)
+    model = MOI.instantiate(solver, with_bridge_type = Float64)
     MOI.Test.runtests(
         model,
         MOI.Test.Config(
@@ -58,7 +58,6 @@ function test_RawOptimizerAttribute()
     @test MOI.get(model, MOI.RawOptimizerAttribute("abstol")) == 2e-5
 end
 
-
 function test_iteration_limit()
     # Problem data
     v = [5.0, 3.0, 1.0]
@@ -66,7 +65,7 @@ function test_iteration_limit()
 
 
     solver = MOI.OptimizerWithAttributes(ECOS.Optimizer, MOI.Silent() => true)
-    model = MOI.instantiate(solver, with_bridge_type=Float64)
+    model = MOI.instantiate(solver, with_bridge_type = Float64)
 
     maxit = 1
     MOI.set(model, MOI.RawOptimizerAttribute("maxit"), maxit)

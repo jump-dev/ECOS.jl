@@ -104,6 +104,8 @@ end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
 
+MOI.get(::Optimizer, ::MOI.SolverVersion) = ver()
+
 function MOI.supports(::Optimizer, param::MOI.RawOptimizerAttribute)
     return hasfield(Csettings, Symbol(param.name))
 end

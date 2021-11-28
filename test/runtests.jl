@@ -7,16 +7,10 @@
 # Test the ECOS.jl solver wrapper
 #############################################################################
 
-using ECOS
-
 using Test
 
 @testset "Test the direct interface" begin
-    include("direct.jl")
-end
-
-@testset "Test passing options" begin
-    include("options.jl")
+    include("c_wrapper.jl")
 end
 
 @testset "MathOptInterface" begin

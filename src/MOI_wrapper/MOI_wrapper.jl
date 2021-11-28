@@ -1,29 +1,7 @@
-mutable struct Solution
-    ret_val::Union{Nothing,Int}
-    primal::Vector{Float64}
-    dual_eq::Vector{Float64}
-    dual_ineq::Vector{Float64}
-    slack::Vector{Float64}
-    objective_value::Float64
-    dual_objective_value::Float64
-    solve_time::Float64
-    iter::Int
-end
+using MathOptInterface
+const MOI = MathOptInterface
 
-# The values used by ECOS are from -7 to 10 so -10 should be safe
-function Solution()
-    return Solution(
-        nothing,
-        Float64[],
-        Float64[],
-        Float64[],
-        Float64[],
-        NaN,
-        NaN,
-        NaN,
-        0,
-    )
-end
+include("permuted_exponential_cone.jl")
 
 MOI.Utilities.@product_of_sets(Zeros, MOI.Zeros)
 
@@ -68,25 +46,53 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     },
 }
 
+mutable struct _Solution
+    ret_val::Union{Nothing,Int}
+    primal::Vector{Float64}
+    dual_eq::Vector{Float64}
+    dual_ineq::Vector{Float64}
+    slack::Vector{Float64}
+    objective_value::Float64
+    dual_objective_value::Float64
+    solve_time::Float64
+    iter::Int
+end
+
+# The values used by ECOS are from -7 to 10 so -10 should be safe
+function _Solution()
+    return _Solution(
+        nothing,
+        Float64[],
+        Float64[],
+        Float64[],
+        Float64[],
+        NaN,
+        NaN,
+        NaN,
+        0,
+    )
+end
+
 mutable struct Optimizer <: MOI.AbstractOptimizer
     zeros::Union{Nothing,Zeros{Cdouble}}
     cones::Union{Nothing,Cones{Cdouble}}
-    sol::Solution
+    sol::_Solution
     silent::Bool
-    options::Dict{String,Any}
+    options::Dict{Symbol,Any}
     function Optimizer(; kwargs...)
-        optimizer = new(nothing, nothing, Solution(), false, Dict{String,Any}())
-        if length(kwargs) > 0
-            @warn(
-                "Passing keyword attributes is deprecated. Use " *
-                "`set_optimizer_attribute` instead.",
-            )
-        end
-        for (key, value) in kwargs
-            MOI.set(optimizer, MOI.RawOptimizerAttribute(String(key)), value)
-        end
-        return optimizer
+        return new(nothing, nothing, _Solution(), false, Dict{Symbol,Any}())
     end
+end
+
+function MOI.is_empty(optimizer::Optimizer)
+    return optimizer.zeros === nothing && optimizer.cones === nothing
+end
+
+function MOI.empty!(optimizer::Optimizer)
+    optimizer.zeros = nothing
+    optimizer.cones = nothing
+    optimizer.sol = _Solution()
+    return
 end
 
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
@@ -109,22 +115,26 @@ end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "ECOS"
 
-MOI.get(::Optimizer, ::MOI.SolverVersion) = ver()
+MOI.get(::Optimizer, ::MOI.SolverVersion) = unsafe_string(ECOS_ver())
+
+# MOI.RawOptimizerAttribute
 
 function MOI.supports(::Optimizer, param::MOI.RawOptimizerAttribute)
-    return hasfield(Csettings, Symbol(param.name))
+    return hasfield(settings, Symbol(param.name))
 end
 
 function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
-    optimizer.options[param.name] = value
+    optimizer.options[Symbol(param.name)] = value
     return
 end
 
 function MOI.get(optimizer::Optimizer, param::MOI.RawOptimizerAttribute)
-    # TODO: This gives a poor error message if the name of the parameter is
-    # invalid.
-    return optimizer.options[param.name]
+    # TODO(odow): This gives a poor error message if the name of the parameter
+    # is invalid.
+    return optimizer.options[Symbol(param.name)]
 end
+
+# MOI.Silent
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true
 
@@ -135,16 +145,7 @@ end
 
 MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
-function MOI.is_empty(optimizer::Optimizer)
-    return optimizer.zeros === nothing && optimizer.cones === nothing
-end
-
-function MOI.empty!(optimizer::Optimizer)
-    optimizer.zeros = nothing
-    optimizer.cones = nothing
-    optimizer.sol = Solution()
-    return
-end
+# MOI.supports
 
 function MOI.supports(
     ::Optimizer,
@@ -204,54 +205,54 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     end
     dest.zeros = deepcopy(Ab.sets) # TODO copy(Ab.sets)
     dest.cones = deepcopy(Gh.sets) # TODO copy(Gh.sets)
-    options = Dict(Symbol(k) => v for (k, v) in dest.options)
+    options = copy(dest.options)
     if dest.silent
         options[:verbose] = false
     end
-    inner = _setup(
+    num_exponential = MOI.get(
+        Gh,
+        MOI.NumberOfConstraints{
+            MOI.VectorAffineFunction{Float64},
+            PermutedExponentialCone,
+        }(),
+    )
+    inner = ECOS_setup(
         A.n,
         G.m,
         A.m,
         Gh.sets.num_rows[1],
         length(q),
         q,
-        MOI.get(
-            Gh,
-            MOI.NumberOfConstraints{
-                MOI.VectorAffineFunction{Float64},
-                PermutedExponentialCone,
-            }(),
-        ),
-        ECOSMatrix(-G.nzval, G.colptr, G.rowval),
-        ECOSMatrix(-A.nzval, A.colptr, A.rowval),
+        num_exponential,
+        -G.nzval,
+        G.colptr,
+        G.rowval,
+        -A.nzval,
+        A.colptr,
+        A.rowval,
         max_sense ? -c0 : c0,
         Gh.constants,
         Ab.constants,
     )
-    settings(inner, options)
-    ret_val = ECOS.solve(inner)
-    ecos_prob = unsafe_load(inner)
-    stat = unsafe_load(ecos_prob.info)
-    solve_time = stat.tsetup + stat.tsolve
-    iter = stat.iter
-    primal = unsafe_wrap(Array, ecos_prob.x, ecos_prob.n)[:]
-    dual_eq = unsafe_wrap(Array, ecos_prob.y, ecos_prob.p)[:]
-    dual_ineq = unsafe_wrap(Array, ecos_prob.z, ecos_prob.m)[:]
-    slack = unsafe_wrap(Array, ecos_prob.s, ecos_prob.m)[:]
-    ECOS.cleanup(inner, 0)
-    objective_value = (max_sense ? -1 : 1) * stat.pcost
-    dual_objective_value = (max_sense ? -1 : 1) * stat.dcost
-    dest.sol = Solution(
+    if inner == C_NULL
+        error("ECOS failed to construct problem.")
+    end
+    unsafe_add_settings(inner, options)
+    ret_val = ECOS_solve(inner)
+    ecos_prob = unsafe_load(inner)::pwork
+    stat = unsafe_load(ecos_prob.info)::stats
+    dest.sol = _Solution(
         ret_val,
-        primal,
-        dual_eq,
-        dual_ineq,
-        slack,
-        objective_value,
-        dual_objective_value,
-        solve_time,
-        iter,
+        copy(unsafe_wrap(Array, ecos_prob.x, ecos_prob.n)),
+        copy(unsafe_wrap(Array, ecos_prob.y, ecos_prob.p)),
+        copy(unsafe_wrap(Array, ecos_prob.z, ecos_prob.m)),
+        copy(unsafe_wrap(Array, ecos_prob.s, ecos_prob.m)),
+        max_sense ? -stat.pcost : stat.pcost,
+        max_sense ? -stat.dcost : stat.dcost,
+        stat.tsetup + stat.tsolve,
+        stat.iter,
     )
+    ECOS_cleanup(inner, 0)
     if !MOI.Utilities.is_ray(MOI.get(dest, MOI.PrimalStatus()))
         dest.sol.objective_value += objective_constant
     end
@@ -315,28 +316,27 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     flag = optimizer.sol.ret_val
     if flag === nothing
         return MOI.OPTIMIZE_NOT_CALLED
-    elseif flag == ECOS.ECOS_OPTIMAL
+    elseif flag == ECOS_OPTIMAL
         return MOI.OPTIMAL
-    elseif flag == ECOS.ECOS_PINF
+    elseif flag == ECOS_PINF
         return MOI.INFEASIBLE
-    elseif flag == ECOS.ECOS_DINF
+    elseif flag == ECOS_DINF
         return MOI.DUAL_INFEASIBLE
-    elseif flag == ECOS.ECOS_MAXIT
+    elseif flag == ECOS_MAXIT
         return MOI.ITERATION_LIMIT
-    elseif flag == ECOS.ECOS_NUMERICS || flag == ECOS.ECOS_OUTCONE
+    elseif flag == ECOS_NUMERICS || flag == ECOS_OUTCONE
         return MOI.NUMERICAL_ERROR
-    elseif flag == ECOS.ECOS_SIGINT
+    elseif flag == ECOS_SIGINT
         return MOI.INTERRUPTED
-    elseif flag == ECOS.ECOS_FATAL
+    elseif flag == ECOS_FATAL
         return MOI.OTHER_ERROR
-    elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_OPTIMAL + ECOS_INACC_OFFSET
         return MOI.ALMOST_OPTIMAL
-    elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_PINF + ECOS_INACC_OFFSET
         return MOI.ALMOST_INFEASIBLE
-    elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
-        return MOI.ALMOST_DUAL_INFEASIBLE
     else
-        error("Unrecognized ECOS solve status flag: $flag.")
+        @assert flag == ECOS_DINF + ECOS_INACC_OFFSET
+        return MOI.ALMOST_DUAL_INFEASIBLE
     end
 end
 
@@ -355,19 +355,19 @@ function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
         return MOI.NO_SOLUTION
     end
     flag = optimizer.sol.ret_val
-    if flag == ECOS.ECOS_OPTIMAL
+    if flag == ECOS_OPTIMAL
         return MOI.FEASIBLE_POINT
-    elseif flag == ECOS.ECOS_PINF
+    elseif flag == ECOS_PINF
         return MOI.INFEASIBLE_POINT
-    elseif flag == ECOS.ECOS_DINF
+    elseif flag == ECOS_DINF
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif flag == ECOS.ECOS_MAXIT
+    elseif flag == ECOS_MAXIT
         return MOI.UNKNOWN_RESULT_STATUS
-    elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_OPTIMAL + ECOS_INACC_OFFSET
         return MOI.NEARLY_FEASIBLE_POINT
-    elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_PINF + ECOS_INACC_OFFSET
         return MOI.INFEASIBLE_POINT
-    elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_DINF + ECOS_INACC_OFFSET
         return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
     else
         return MOI.OTHER_RESULT_STATUS
@@ -406,33 +406,32 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
         return MOI.NO_SOLUTION
     end
     flag = optimizer.sol.ret_val
-    if flag == ECOS.ECOS_OPTIMAL
+    if flag == ECOS_OPTIMAL
         return MOI.FEASIBLE_POINT
-    elseif flag == ECOS.ECOS_PINF
+    elseif flag == ECOS_PINF
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif flag == ECOS.ECOS_DINF
+    elseif flag == ECOS_DINF
         return MOI.INFEASIBLE_POINT
-    elseif flag == ECOS.ECOS_MAXIT
+    elseif flag == ECOS_MAXIT
         return MOI.UNKNOWN_RESULT_STATUS
-    elseif flag == ECOS.ECOS_OPTIMAL + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_OPTIMAL + ECOS_INACC_OFFSET
         return MOI.NEARLY_FEASIBLE_POINT
-    elseif flag == ECOS.ECOS_PINF + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_PINF + ECOS_INACC_OFFSET
         return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
-    elseif flag == ECOS.ECOS_DINF + ECOS.ECOS_INACC_OFFSET
+    elseif flag == ECOS_DINF + ECOS_INACC_OFFSET
         return MOI.INFEASIBLE_POINT
-    else
-        return MOI.OTHER_RESULT_STATUS
     end
+    return MOI.OTHER_RESULT_STATUS
 end
 
-function _dual(
-    optimizer,
-    ::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},MOI.Zeros},
+function MOI.get(
+    optimizer::Optimizer,
+    attr::MOI.ConstraintDual,
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},MOI.Zeros},
 )
-    return optimizer.sol.dual_eq
+    MOI.check_result_index_bounds(optimizer, attr)
+    return optimizer.sol.dual_eq[_rows(optimizer, ci)]
 end
-
-_dual(optimizer, ::MOI.ConstraintIndex) = optimizer.sol.dual_ineq
 
 function MOI.get(
     optimizer::Optimizer,
@@ -440,7 +439,7 @@ function MOI.get(
     ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return _dual(optimizer, ci)[_rows(optimizer, ci)]
+    return optimizer.sol.dual_ineq[_rows(optimizer, ci)]
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1

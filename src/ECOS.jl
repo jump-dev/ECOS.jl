@@ -9,9 +9,6 @@
 
 module ECOS
 
-using CEnum
-import SparseArrays
-
 if VERSION < v"1.3"
     file = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
     if isfile(file)
@@ -23,6 +20,8 @@ else
     import ECOS_jll
     const ecos = ECOS_jll.libecos
 end
+
+using CEnum
 
 include("gen/libecos_common.jl")
 include("gen/libecos_api.jl")
@@ -46,10 +45,10 @@ include("MOI_wrapper/MOI_wrapper.jl")
 
 function __init__()
     libecos_version = VersionNumber(unsafe_string(ECOS_ver()))
-    if libecos_version < v"2.0.8"
+    if libecos_version < v"2.0.5"
         error(
             "Current ECOS version installed is $(libecos_version), but we " *
-            "require minimum version of 2.0.8",
+            "require minimum version of 2.0.5",
         )
     end
     return

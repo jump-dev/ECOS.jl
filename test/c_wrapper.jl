@@ -8,10 +8,8 @@
 # Test the direct interface for the ECOS.jl solver wrapper
 #############################################################################
 
-using LinearAlgebra
-using SparseArrays
-
 import ECOS
+import SparseArrays
 using Test
 
 """

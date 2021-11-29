@@ -229,9 +229,11 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
         length(q),
         q,
         num_exponential,
+        # Negated because ECOS uses `h - Gx ∈ K`.
         -G.nzval,
         G.colptr,
         G.rowval,
+        # Negated because ECOS uses `b -  Ax = 0`.
         -A.nzval,
         A.colptr,
         A.rowval,
@@ -261,7 +263,14 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     if !MOI.Utilities.is_ray(MOI.get(dest, MOI.PrimalStatus()))
         dest.sol.objective_value += objective_constant
     end
-    if !MOI.Utilities.is_ray(MOI.get(dest, MOI.DualStatus()))
+    if MOI.Utilities.is_ray(MOI.get(dest, MOI.DualStatus()))
+        # ECOS can return very large rays here! Without this rescaling it fails
+        # many of the MOI tests due to rounding error in floating-point.
+        len = sqrt(sum(dest.sol.dual_ineq.^2) + sum(dest.sol.dual_eq.^2))
+        dest.sol.dual_ineq ./= len
+        dest.sol.dual_eq ./= len
+        dest.sol.dual_objective_value /= len
+    else
         dest.sol.dual_objective_value += objective_constant
     end
     return

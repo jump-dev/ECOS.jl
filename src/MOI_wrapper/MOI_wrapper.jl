@@ -57,6 +57,7 @@ mutable struct _Solution
     dual_eq::Vector{pfloat}
     dual_ineq::Vector{pfloat}
     slack::Vector{pfloat}
+    slack_eq::Vector{pfloat}
     objective_value::pfloat
     dual_objective_value::pfloat
     solve_time::pfloat
@@ -67,6 +68,7 @@ end
 function _Solution()
     return _Solution(
         nothing,
+        pfloat[],
         pfloat[],
         pfloat[],
         pfloat[],
@@ -221,6 +223,9 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
             PermutedExponentialCone,
         }(),
     )
+    # This is before ECOS_setup because ECOS modifies the constant vectors
+    # in-place!
+    slack_eq = copy(Ab.constants)
     inner = ECOS_setup(
         A.n,
         G.m,
@@ -248,12 +253,19 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     ret_val = ECOS_solve(inner)
     ecos_prob = unsafe_load(inner)::pwork
     stat = unsafe_load(ecos_prob.info)::stats
+    x = copy(unsafe_wrap(Array, ecos_prob.x, ecos_prob.n))
+    for col in 1:A.n
+        for i in A.colptr[col]:(A.colptr[col+1]-1)
+            slack_eq[A.rowval[i+1]+1] += A.nzval[i+1] * x[col]
+        end
+    end
     dest.sol = _Solution(
         ret_val,
-        copy(unsafe_wrap(Array, ecos_prob.x, ecos_prob.n)),
+        x,
         copy(unsafe_wrap(Array, ecos_prob.y, ecos_prob.p)),
         copy(unsafe_wrap(Array, ecos_prob.z, ecos_prob.m)),
         copy(unsafe_wrap(Array, ecos_prob.s, ecos_prob.m)),
+        slack_eq,
         max_sense ? -stat.pcost : stat.pcost,
         max_sense ? -stat.dcost : stat.dcost,
         stat.tsetup + stat.tsolve,
@@ -403,7 +415,7 @@ function MOI.get(
     ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{pfloat},MOI.Zeros},
 )
     MOI.check_result_index_bounds(optimizer, attr)
-    return zeros(length(_rows(optimizer, ci)))
+    return optimizer.sol.slack_eq[_rows(optimizer, ci)]
 end
 
 function MOI.get(

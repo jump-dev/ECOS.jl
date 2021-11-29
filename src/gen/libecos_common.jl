@@ -3,7 +3,7 @@
 const CONEMODE = 0
 const INSIDE_CONE = 0
 const OUTSIDE_CONE = 1
-const idxint = Clong
+const idxint = @static Sys.iswindows() ? Int64 : Clong
 const pfloat = Cdouble
 
 struct lpcone

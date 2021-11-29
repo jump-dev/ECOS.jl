@@ -9,17 +9,8 @@
 
 module ECOS
 
-if VERSION < v"1.3"
-    file = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
-    if isfile(file)
-        include(file)
-    else
-        error("ECOS not properly installed. Please run Pkg.build(\"ECOS\")")
-    end
-else
-    import ECOS_jll
-    const ecos = ECOS_jll.libecos
-end
+import ECOS_jll
+const ecos = ECOS_jll.libecos
 
 using CEnum
 
@@ -45,10 +36,10 @@ include("MOI_wrapper/MOI_wrapper.jl")
 
 function __init__()
     libecos_version = VersionNumber(unsafe_string(ECOS_ver()))
-    if libecos_version < v"2.0.5"
+    if libecos_version != v"2.0.8"
         error(
             "Current ECOS version installed is $(libecos_version), but we " *
-            "require minimum version of 2.0.5",
+            "require version 2.0.8",
         )
     end
     return

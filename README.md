@@ -61,4 +61,4 @@ verbose        # verbosity bool for PRINTLEVEL < 3
 After ECOS.jl is installed and built, you can replace the installed `libecos`
 dependency with a custom installation by following the
 [Pkg documentation for overriding artifacts](https://julialang.github.io/Pkg.jl/v1/artifacts/#Overriding-artifact-locations-1).
-Note that your custom `libecos` is required to be at least version 2.0.8.
+Note that your custom `libecos` is required to be version 2.0.8.

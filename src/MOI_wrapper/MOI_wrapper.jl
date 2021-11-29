@@ -18,54 +18,59 @@ MOI.Utilities.@struct_of_constraints_by_set_types(
     Union{MOI.Nonnegatives,MOI.SecondOrderCone,PermutedExponentialCone},
 )
 
+# !!! danger
+#     Make sure to use ECOS's definition of pfloat for double and idxint for
+#     int. These are _not_ the same across platforms, differ from Julia's
+#     Cdouble and Clong, and even differ across patch releases of ECOS :(.
+
 const OptimizerCache = MOI.Utilities.GenericModel{
-    Cdouble,
-    MOI.Utilities.ObjectiveContainer{Cdouble},
-    MOI.Utilities.VariablesContainer{Cdouble},
-    ZerosOrNot{Cdouble}{
+    pfloat,
+    MOI.Utilities.ObjectiveContainer{pfloat},
+    MOI.Utilities.VariablesContainer{pfloat},
+    ZerosOrNot{pfloat}{
         MOI.Utilities.MatrixOfConstraints{
-            Cdouble,
+            pfloat,
             MOI.Utilities.MutableSparseMatrixCSC{
-                Cdouble,
-                Clong,
+                pfloat,
+                idxint,
                 MOI.Utilities.ZeroBasedIndexing,
             },
-            Vector{Cdouble},
-            Zeros{Cdouble},
+            Vector{pfloat},
+            Zeros{pfloat},
         },
         MOI.Utilities.MatrixOfConstraints{
-            Cdouble,
+            pfloat,
             MOI.Utilities.MutableSparseMatrixCSC{
-                Cdouble,
-                Clong,
+                pfloat,
+                idxint,
                 MOI.Utilities.ZeroBasedIndexing,
             },
-            Vector{Cdouble},
-            Cones{Cdouble},
+            Vector{pfloat},
+            Cones{pfloat},
         },
     },
 }
 
 mutable struct _Solution
-    ret_val::Union{Nothing,Int}
-    primal::Vector{Float64}
-    dual_eq::Vector{Float64}
-    dual_ineq::Vector{Float64}
-    slack::Vector{Float64}
-    objective_value::Float64
-    dual_objective_value::Float64
-    solve_time::Float64
-    iter::Int
+    ret_val::Union{Nothing,idxint}
+    primal::Vector{pfloat}
+    dual_eq::Vector{pfloat}
+    dual_ineq::Vector{pfloat}
+    slack::Vector{pfloat}
+    objective_value::pfloat
+    dual_objective_value::pfloat
+    solve_time::pfloat
+    iter::idxint
 end
 
 # The values used by ECOS are from -7 to 10 so -10 should be safe
 function _Solution()
     return _Solution(
         nothing,
-        Float64[],
-        Float64[],
-        Float64[],
-        Float64[],
+        pfloat[],
+        pfloat[],
+        pfloat[],
+        pfloat[],
         NaN,
         NaN,
         NaN,
@@ -74,8 +79,8 @@ function _Solution()
 end
 
 mutable struct Optimizer <: MOI.AbstractOptimizer
-    zeros::Union{Nothing,Zeros{Cdouble}}
-    cones::Union{Nothing,Cones{Cdouble}}
+    zeros::Union{Nothing,Zeros{pfloat}}
+    cones::Union{Nothing,Cones{pfloat}}
     sol::_Solution
     silent::Bool
     options::Dict{Symbol,Any}
@@ -96,19 +101,19 @@ function MOI.empty!(optimizer::Optimizer)
 end
 
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
-    return [PermutedExponentialBridge{Cdouble}]
+    return [PermutedExponentialBridge{pfloat}]
 end
 
 function _rows(
     optimizer::Optimizer,
-    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},MOI.Zeros},
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{pfloat},MOI.Zeros},
 )
     return MOI.Utilities.rows(optimizer.zeros, ci)
 end
 
 function _rows(
     optimizer::Optimizer,
-    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{pfloat}},
 )
     return MOI.Utilities.rows(optimizer.cones, ci)
 end
@@ -151,7 +156,7 @@ function MOI.supports(
     ::Optimizer,
     ::Union{
         MOI.ObjectiveSense,
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{pfloat}},
     },
 )
     return true
@@ -159,7 +164,7 @@ end
 
 function MOI.supports_constraint(
     ::Optimizer,
-    ::Type{MOI.VectorAffineFunction{Float64}},
+    ::Type{MOI.VectorAffineFunction{pfloat}},
     ::Type{
         <:Union{
             MOI.Zeros,
@@ -176,20 +181,20 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     Ab = MOI.Utilities.constraints(
         src.constraints,
-        MOI.VectorAffineFunction{Float64},
+        MOI.VectorAffineFunction{pfloat},
         MOI.Zeros,
     )
     A = Ab.coefficients
     Gh = MOI.Utilities.constraints(
         src.constraints,
-        MOI.VectorAffineFunction{Float64},
+        MOI.VectorAffineFunction{pfloat},
         MOI.Nonnegatives,
     )
     G = Gh.coefficients
     soc_indices = MOI.get(
         Gh,
         MOI.ListOfConstraintIndices{
-            MOI.VectorAffineFunction{Float64},
+            MOI.VectorAffineFunction{pfloat},
             MOI.SecondOrderCone,
         }(),
     )
@@ -197,7 +202,7 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     @assert A.n == G.n
     max_sense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     obj =
-        MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+        MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{pfloat}}())
     objective_constant = MOI.constant(obj)
     c0 = zeros(A.n)
     for term in obj.terms
@@ -212,7 +217,7 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     num_exponential = MOI.get(
         Gh,
         MOI.NumberOfConstraints{
-            MOI.VectorAffineFunction{Float64},
+            MOI.VectorAffineFunction{pfloat},
             PermutedExponentialCone,
         }(),
     )
@@ -386,7 +391,7 @@ end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},MOI.Zeros},
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{pfloat},MOI.Zeros},
 )
     MOI.check_result_index_bounds(optimizer, attr)
     return zeros(length(_rows(optimizer, ci)))
@@ -427,7 +432,7 @@ end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},MOI.Zeros},
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{pfloat},MOI.Zeros},
 )
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.dual_eq[_rows(optimizer, ci)]
@@ -436,7 +441,7 @@ end
 function MOI.get(
     optimizer::Optimizer,
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64}},
+    ci::MOI.ConstraintIndex{MOI.VectorAffineFunction{pfloat}},
 )
     MOI.check_result_index_bounds(optimizer, attr)
     return optimizer.sol.dual_ineq[_rows(optimizer, ci)]

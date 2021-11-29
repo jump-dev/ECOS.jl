@@ -266,7 +266,7 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     if MOI.Utilities.is_ray(MOI.get(dest, MOI.DualStatus()))
         # ECOS can return very large rays here! Without this rescaling it fails
         # many of the MOI tests due to rounding error in floating-point.
-        len = sqrt(sum(dest.sol.dual_ineq.^2) + sum(dest.sol.dual_eq.^2))
+        len = sqrt(sum(dest.sol.dual_ineq .^ 2) + sum(dest.sol.dual_eq .^ 2))
         dest.sol.dual_ineq ./= len
         dest.sol.dual_eq ./= len
         dest.sol.dual_objective_value /= len

@@ -10,7 +10,6 @@
 module ECOS
 
 import ECOS_jll
-const ecos = ECOS_jll.libecos
 
 using CEnum
 
@@ -35,6 +34,7 @@ end
 include("MOI_wrapper/MOI_wrapper.jl")
 
 function __init__()
+    global ecos = ECOS_jll.libecos
     libecos_version = VersionNumber(unsafe_string(ECOS_ver()))
     if libecos_version != v"2.0.8"
         error(

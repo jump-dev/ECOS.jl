@@ -91,6 +91,31 @@ function test_iteration_limit()
     return
 end
 
+function test_empty_problem()
+    model = MOI.Utilities.Model{Float64}()
+    ecos = ECOS.Optimizer()
+    MOI.optimize!(ecos, model)
+    @test MOI.get(ecos, MOI.TerminationStatus()) == MOI.INVALID_MODEL
+    @test MOI.get(ecos, MOI.PrimalStatus()) == MOI.NO_SOLUTION
+    @test MOI.get(ecos, MOI.DualStatus()) == MOI.NO_SOLUTION
+    return
+end
+
+function test_conic_no_variables()
+    model = MOI.Utilities.Model{Float64}()
+    ecos = ECOS.Optimizer()
+    f = MOI.VectorAffineFunction(
+        MOI.VectorAffineTerm{Float64}[],
+        [1.0, 0.5, 0.5],
+    )
+    MOI.add_constraint(model, f, MOI.SecondOrderCone(3))
+    MOI.optimize!(ecos, model)
+    @test MOI.get(ecos, MOI.TerminationStatus()) == MOI.INVALID_MODEL
+    @test MOI.get(ecos, MOI.PrimalStatus()) == MOI.NO_SOLUTION
+    @test MOI.get(ecos, MOI.DualStatus()) == MOI.NO_SOLUTION
+    return
+end
+
 end  # module
 
 TestECOS.runtests()

@@ -179,6 +179,15 @@ function MOI.supports_constraint(
     return true
 end
 
+# This should be a valid idxint, but not one of the constants ECOS uses.
+const _ECOS_INVALID_MODEL = -9999
+
+function _set_errored_solution_status(dest::Optimizer, status)
+    dest.sol = _Solution()
+    dest.sol.ret_val = status
+    return
+end
+
 function _optimize!(dest::Optimizer, src::OptimizerCache)
     MOI.empty!(dest)
     Ab = MOI.Utilities.constraints(
@@ -202,6 +211,10 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
     )
     q = MOI.dimension.(MOI.get.(Gh, MOI.ConstraintSet(), soc_indices))
     @assert A.n == G.n
+    if A.n == 0
+        _set_errored_solution_status(dest, _ECOS_INVALID_MODEL)
+        return
+    end
     max_sense = MOI.get(src, MOI.ObjectiveSense()) == MOI.MAX_SENSE
     obj =
         MOI.get(src, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{pfloat}}())
@@ -247,7 +260,8 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
         Ab.constants,
     )
     if inner == C_NULL
-        error("ECOS failed to construct problem.")
+        _set_errored_solution_status(dest, ECOS_FATAL)
+        return
     end
     unsafe_add_settings(inner, options)
     ret_val = ECOS_solve(inner)
@@ -331,9 +345,11 @@ function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
         return "s or z got outside the cone, numerics?"
     elseif flag == ECOS_SIGINT
         return "solver interrupted by a signal/ctrl-c"
-    else
-        @assert flag == ECOS_FATAL
+    elseif flag == ECOS_FATAL
         return "Unknown problem in solver"
+    else
+        @assert flag == _ECOS_INVALID_MODEL
+        return "Invalid model: you must have at least one variable"
     end
 end
 
@@ -360,9 +376,11 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
         return MOI.ALMOST_OPTIMAL
     elseif flag == ECOS_PINF + ECOS_INACC_OFFSET
         return MOI.ALMOST_INFEASIBLE
-    else
-        @assert flag == ECOS_DINF + ECOS_INACC_OFFSET
+    elseif flag == ECOS_DINF + ECOS_INACC_OFFSET
         return MOI.ALMOST_DUAL_INFEASIBLE
+    else
+        @assert flag == _ECOS_INVALID_MODEL
+        return MOI.INVALID_MODEL
     end
 end
 
@@ -395,6 +413,10 @@ function MOI.get(optimizer::Optimizer, attr::MOI.PrimalStatus)
         return MOI.INFEASIBLE_POINT
     elseif flag == ECOS_DINF + ECOS_INACC_OFFSET
         return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
+    elseif flag == ECOS_FATAL
+        return MOI.NO_SOLUTION
+    elseif flag == _ECOS_INVALID_MODEL
+        return MOI.NO_SOLUTION
     else
         return MOI.OTHER_RESULT_STATUS
     end
@@ -446,6 +468,10 @@ function MOI.get(optimizer::Optimizer, attr::MOI.DualStatus)
         return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
     elseif flag == ECOS_DINF + ECOS_INACC_OFFSET
         return MOI.INFEASIBLE_POINT
+    elseif flag == ECOS_FATAL
+        return MOI.NO_SOLUTION
+    elseif flag == _ECOS_INVALID_MODEL
+        return MOI.NO_SOLUTION
     end
     return MOI.OTHER_RESULT_STATUS
 end

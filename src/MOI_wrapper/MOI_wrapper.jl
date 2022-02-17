@@ -80,15 +80,19 @@ function _Solution()
     )
 end
 
+"""
+    Optimizer()
+
+Create a new ECOS optimizer.
+"""
 mutable struct Optimizer <: MOI.AbstractOptimizer
     zeros::Union{Nothing,Zeros{pfloat}}
     cones::Union{Nothing,Cones{pfloat}}
     sol::_Solution
     silent::Bool
     options::Dict{Symbol,Any}
-    function Optimizer(; kwargs...)
-        return new(nothing, nothing, _Solution(), false, Dict{Symbol,Any}())
-    end
+
+    Optimizer() = new(nothing, nothing, _Solution(), false, Dict{Symbol,Any}())
 end
 
 function MOI.is_empty(optimizer::Optimizer)

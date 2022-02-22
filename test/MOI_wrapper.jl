@@ -18,7 +18,12 @@ function runtests()
 end
 
 function test_runtests()
-    model = MOI.instantiate(ECOS.Optimizer, with_bridge_type = Float64)
+    # This is what JuMP would construct
+    model = MOI.Utilities.CachingOptimizer(
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+        MOI.instantiate(ECOS.Optimizer; with_bridge_type = Float64),
+    )
+    @test model.optimizer.model.model_cache isa MOI.Utilities.UniversalFallback{ECOS.OptimizerCache}
     MOI.set(model, MOI.Silent(), true)
     exclude = String[
         # Expected test failures:

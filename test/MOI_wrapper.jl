@@ -24,8 +24,12 @@ function test_runtests()
         MOI.instantiate(ECOS.Optimizer; with_bridge_type = Float64),
     )
     # Remove bridge as it it making some tests fails because they require duals
-    MOI.Bridges.remove_bridge(model.optimizer, MOI.Bridges.Variable.ZerosBridge{Float64})
-    @test model.optimizer.model.model_cache isa MOI.Utilities.UniversalFallback{ECOS.OptimizerCache}
+    MOI.Bridges.remove_bridge(
+        model.optimizer,
+        MOI.Bridges.Variable.ZerosBridge{Float64},
+    )
+    @test model.optimizer.model.model_cache isa
+          MOI.Utilities.UniversalFallback{ECOS.OptimizerCache}
     MOI.set(model, MOI.Silent(), true)
     exclude = String[]
     if Sys.WORD_SIZE == 32

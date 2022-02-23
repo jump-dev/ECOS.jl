@@ -23,21 +23,11 @@ function test_runtests()
         MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
         MOI.instantiate(ECOS.Optimizer; with_bridge_type = Float64),
     )
+    # Remove bridge as it it making some tests fails because they require duals
+    MOI.Bridges.remove_bridge(model.optimizer, MOI.Bridges.Variable.ZerosBridge{Float64})
     @test model.optimizer.model.model_cache isa MOI.Utilities.UniversalFallback{ECOS.OptimizerCache}
     MOI.set(model, MOI.Silent(), true)
-    exclude = String[
-        # Expected test failures:
-        #   Problem is a nonconvex QP (fixed in MOI 0.10.6)
-        "test_basic_ScalarQuadraticFunction_EqualTo",
-        "test_basic_ScalarQuadraticFunction_GreaterThan",
-        "test_basic_ScalarQuadraticFunction_Interval",
-        "test_basic_VectorQuadraticFunction_",
-        "test_quadratic_SecondOrderCone_basic",
-        "test_quadratic_nonconvex_",
-        #   MathOptInterface.jl issue #1431
-        "test_model_LowerBoundAlreadySet",
-        "test_model_UpperBoundAlreadySet",
-    ]
+    exclude = String[]
     if Sys.WORD_SIZE == 32
         # These tests fail on x86 Linux, returning ITERATION_LIMIT instead of
         # proving {primal,dual}_INFEASIBLE.

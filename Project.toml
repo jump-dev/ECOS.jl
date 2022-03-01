@@ -11,7 +11,7 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 [compat]
 CEnum = "0.3, 0.4"
 ECOS_jll = "=2.0.8, =200.0.800"
-MathOptInterface = "1.0.1"
+MathOptInterface = "1.1"
 julia = "1.6"
 
 [extras]

@@ -18,20 +18,21 @@ function runtests()
 end
 
 function test_runtests()
-    model = MOI.instantiate(ECOS.Optimizer, with_bridge_type = Float64)
+    model = MOI.Utilities.CachingOptimizer(
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+        MOI.instantiate(ECOS.Optimizer; with_bridge_type = Float64),
+    )
+    @test model.optimizer.model.model_cache isa
+          MOI.Utilities.UniversalFallback{ECOS.OptimizerCache}
     MOI.set(model, MOI.Silent(), true)
     exclude = String[
-        # Expected test failures:
-        #   Problem is a nonconvex QP (fixed in MOI 0.10.6)
-        "test_basic_ScalarQuadraticFunction_EqualTo",
-        "test_basic_ScalarQuadraticFunction_GreaterThan",
-        "test_basic_ScalarQuadraticFunction_Interval",
-        "test_basic_VectorQuadraticFunction_",
-        "test_quadratic_SecondOrderCone_basic",
-        "test_quadratic_nonconvex_",
-        #   MathOptInterface.jl issue #1431
-        "test_model_LowerBoundAlreadySet",
-        "test_model_UpperBoundAlreadySet",
+        # ZerosBridge does not support ConstraintDual. These are tested below in
+        # test_runtests_ZerosBridge
+        "test_conic_RotatedSecondOrderCone_INFEASIBLE_2",
+        "test_conic_linear_VectorOfVariables_2",
+        "test_linear_integration",
+        "test_quadratic_constraint_GreaterThan",
+        "test_quadratic_constraint_LessThan",
     ]
     if Sys.WORD_SIZE == 32
         # These tests fail on x86 Linux, returning ITERATION_LIMIT instead of
@@ -51,6 +52,39 @@ function test_runtests()
             ],
         ),
         exclude = exclude,
+    )
+    return
+end
+
+function test_runtests_ZerosBridge()
+    optimizer = MOI.instantiate(ECOS.Optimizer; with_bridge_type = Float64)
+    MOI.Bridges.remove_bridge(
+        optimizer,
+        MOI.Bridges.Variable.ZerosBridge{Float64},
+    )
+    model = MOI.Utilities.CachingOptimizer(
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+        optimizer,
+    )
+    MOI.Test.runtests(
+        model,
+        MOI.Test.Config(
+            atol = 1e-3,
+            rtol = 1e-3,
+            exclude = Any[
+                MOI.ConstraintBasisStatus,
+                MOI.VariableBasisStatus,
+                MOI.ObjectiveBound,
+            ],
+        ),
+        include = String[
+            # ZerosBridge does not support ConstraintDual
+            "test_conic_RotatedSecondOrderCone_INFEASIBLE_2",
+            "test_conic_linear_VectorOfVariables_2",
+            "test_linear_integration",
+            "test_quadratic_constraint_GreaterThan",
+            "test_quadratic_constraint_LessThan",
+        ],
     )
     return
 end

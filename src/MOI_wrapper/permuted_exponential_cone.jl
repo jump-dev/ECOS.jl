@@ -4,6 +4,12 @@
 struct PermutedExponentialCone <: MOI.AbstractVectorSet end
 
 Base.copy(set::PermutedExponentialCone) = set
+function MOI.Utilities.set_with_dimension(::Type{PermutedExponentialCone}, dim)
+    if dim != 3
+        error("Cannot create a `PermutedExponentialCone` with dimension $dim.")
+    end
+    return PermutedExponentialCone()
+end
 
 struct PermutedExponentialBridge{T,F} <: MOI.Bridges.Constraint.SetMapBridge{
     T,

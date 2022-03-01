@@ -51,6 +51,8 @@ const OptimizerCache = MOI.Utilities.GenericModel{
     },
 }
 
+Base.show(io::IO, ::Type{OptimizerCache}) = print(io, "ECOS.OptimizerCache")
+
 mutable struct _Solution
     ret_val::Union{Nothing,idxint}
     primal::Vector{pfloat}
@@ -93,6 +95,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     options::Dict{Symbol,Any}
 
     Optimizer() = new(nothing, nothing, _Solution(), false, Dict{Symbol,Any}())
+end
+
+function MOI.default_cache(::Optimizer, ::Type{pfloat})
+    return MOI.Utilities.UniversalFallback(OptimizerCache())
 end
 
 function MOI.is_empty(optimizer::Optimizer)
@@ -309,6 +315,14 @@ end
 function MOI.optimize!(dest::Optimizer, src::OptimizerCache)
     _optimize!(dest, src)
     return MOI.Utilities.identity_index_map(src), false
+end
+
+function MOI.copy_to(
+    dest::Optimizer,
+    src::MOI.Utilities.UniversalFallback{OptimizerCache},
+)
+    MOI.Utilities.throw_unsupported(src)
+    return MOI.copy_to(dest, src.model)
 end
 
 function MOI.optimize!(dest::Optimizer, src::MOI.ModelLike)

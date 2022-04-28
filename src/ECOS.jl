@@ -3,15 +3,6 @@
 # Use of this source code is governed by an MIT-style license that can be found
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
-#############################################################################
-# ECOS.jl
-# Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
-# See http://github.com/jump-dev/ECOS.jl
-#############################################################################
-# ECOS.jl
-# Contains the wrapper itself
-#############################################################################
-
 module ECOS
 
 import ECOS_jll

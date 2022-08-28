@@ -18,9 +18,10 @@ import Pkg; Pkg.add("ECOS")
 ```
 
 In addition to installing the ECOS.jl package, this will also download and
-install the ECOS binaries. (You do not need to install ECOS separately.) If you
-require a custom build of ECOS, see the **Custom Installation** instructions
-below.
+install the ECOS binaries. (You do not need to install ECOS separately.)
+
+To use a custom binary, read the [Custom solver binaries](https://jump.dev/JuMP.jl/stable/developers/custom_solver_binaries/)
+section of the JuMP documentation.
 
 ### License
 
@@ -55,10 +56,3 @@ nitref         # number of iterative refinement steps
 maxit          # maximum number of iterations
 verbose        # verbosity bool for PRINTLEVEL < 3
 ```
-
-## Custom Installation
-
-After ECOS.jl is installed and built, you can replace the installed `libecos`
-dependency with a custom installation by following the
-[Pkg documentation for overriding artifacts](https://julialang.github.io/Pkg.jl/v1/artifacts/#Overriding-artifact-locations-1).
-Note that your custom `libecos` is required to be version 2.0.8.

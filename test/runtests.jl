@@ -1,11 +1,7 @@
-#############################################################################
-# ECOS.jl
-# Wrapper around the ECOS solver https://github.com/ifa-ethz/ecos
-# See http://github.com/jump-dev/ECOS.jl
-#############################################################################
-# test/runtests.jl
-# Test the ECOS.jl solver wrapper
-#############################################################################
+# Copyright (c) 2014: Joao Felipe Santos, Iain Dunning, and contributors
+#
+# Use of this source code is governed by an MIT-style license that can be found
+# in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
 using Test
 

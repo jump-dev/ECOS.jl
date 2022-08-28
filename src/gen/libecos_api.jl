@@ -1,3 +1,8 @@
+# Copyright (c) 2014: Joao Felipe Santos, Iain Dunning, and contributors
+#
+# Use of this source code is governed by an MIT-style license that can be found
+# in the LICENSE.md file or at https://opensource.org/licenses/MIT.
+
 # Julia wrapper for header: cone.h
 # Automatically generated using Clang.jl
 

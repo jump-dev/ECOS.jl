@@ -1,4 +1,4 @@
-# Copyright (c) 2014: ECOS.jl contributors
+# Copyright (c) 2014: Joao Felipe Santos, Iain Dunning, and contributors
 #
 # Use of this source code is governed by an MIT-style license that can be found
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.

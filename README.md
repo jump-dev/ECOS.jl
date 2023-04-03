@@ -8,7 +8,7 @@ optimization interior point solver.
 
 The wrapper has two components:
  * a thin wrapper around the complete C API
- * an iterface to [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)
+ * an interface to [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)
 
 ## Affiliation
 
@@ -36,7 +36,7 @@ section of the JuMP documentation.
 
 ## Use with JuMP
 
-TO use ECOS with [JuMP](https://github.com/jump-dev/JuMP.jl), use
+To use ECOS with [JuMP](https://github.com/jump-dev/JuMP.jl), use
 `ECOS.Optimizer`:
 ```julia
 using JuMP, ECOS

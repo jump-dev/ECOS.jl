@@ -86,4 +86,4 @@ The following options are supported:
 | `reltol_inacc`  | relative relaxed tolerance on duality gap   |
 | `nitref`        | number of iterative refinement steps        |
 | `maxit`         | maximum number of iterations                |
-| `verbose`       | verbosity bool for PRINTLEVEL < 3           |
+| `verbose`       | verbosity `bool` for `PRINTLEVEL < 3`       |

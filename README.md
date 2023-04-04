@@ -3,16 +3,18 @@
 [![Build Status](https://github.com/jump-dev/ECOS.jl/workflows/CI/badge.svg?branch=master)](https://github.com/jump-dev/ECOS.jl/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/jump-dev/ECOS.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jump-dev/ECOS.jl)
 
-[ECOS.jl](https://github.com/jump-dev/ECOS.jl) is a wrapper for the [ECOS](https://github.com/embotech/ecos) embeddable conic
-optimization interior point solver.
+[ECOS.jl](https://github.com/jump-dev/ECOS.jl) is a wrapper for the
+[ECOS](https://github.com/embotech/ecos) solver.
 
 The wrapper has two components:
+
  * a thin wrapper around the complete C API
  * an interface to [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)
 
 ## Affiliation
 
-This wrapper is maintained by the JuMP community and is not an embotech project.
+This wrapper is maintained by the JuMP community and is not a product of
+Embotech AG.
 
 ## License
 
@@ -25,11 +27,12 @@ licensed under the [GPL v3 license](https://github.com/embotech/ecos/blob/develo
 
 Install ECOS.jl using `Pkg.add`:
 ```julia
-import Pkg; Pkg.add("ECOS")
+import Pkg
+Pkg.add("ECOS")
 ```
 
 In addition to installing the ECOS.jl package, this will also download and
-install the ECOS binaries. (You do not need to install ECOS separately.)
+install the ECOS binaries. You do not need to install ECOS separately.
 
 To use a custom binary, read the [Custom solver binaries](https://jump.dev/JuMP.jl/stable/developers/custom_solver_binaries/)
 section of the JuMP documentation.
@@ -68,19 +71,19 @@ List of supported model attributes:
 
 ## Options
 
-The list of options is defined the [`ecos.h` header](https://github.com/embotech/ecos/blob/master/include/ecos.h),
-which we reproduce here:
-```raw
-gamma          # scaling the final step length
-delta          # regularization parameter
-eps            # regularization threshold
-feastol        # primal/dual infeasibility tolerance
-abstol         # absolute tolerance on duality gap
-reltol         # relative tolerance on duality gap
-feastol_inacc  # primal/dual infeasibility relaxed tolerance
-abstol_inacc   # absolute relaxed tolerance on duality gap
-reltol_inacc   # relative relaxed tolerance on duality gap
-nitref         # number of iterative refinement steps
-maxit          # maximum number of iterations
-verbose        # verbosity bool for PRINTLEVEL < 3
-```
+The following options are supported:
+
+| Parameter       | Explanation                                 |
+| --------------- | ------------------------------------------- |
+| `gamma`         | scaling the final step length               |
+| `delta`         | regularization parameter                    |
+| `eps`           | regularization threshold                    |
+| `feastol`       | primal/dual infeasibility tolerance         |
+| `abstol`        | absolute tolerance on duality gap           |
+| `reltol`        | relative tolerance on duality gap           |
+| `feastol_inacc` | primal/dual infeasibility relaxed tolerance |
+| `abstol_inacc`  | absolute relaxed tolerance on duality gap   |
+| `reltol_inacc`  | relative relaxed tolerance on duality gap   |
+| `nitref`        | number of iterative refinement steps        |
+| `maxit`         | maximum number of iterations                |
+| `verbose`       | verbosity bool for PRINTLEVEL < 3           |

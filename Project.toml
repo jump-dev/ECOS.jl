@@ -1,7 +1,7 @@
 name = "ECOS"
 uuid = "e2685f51-7e38-5353-a97d-a921fd2c8199"
 repo = "https://github.com/jump-dev/ECOS.jl.git"
-version = "1.1.1"
+version = "1.1.2"
 
 [deps]
 CEnum = "fa961155-64e5-5f13-b03f-caf6b980ea82"
@@ -9,9 +9,11 @@ ECOS_jll = "c2c64177-6a8e-5dca-99a7-64895ad7445f"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [compat]
-CEnum = "0.3, 0.4"
+CEnum = "0.3, 0.4, 0.5"
 ECOS_jll = "=2.0.8, =200.0.800"
 MathOptInterface = "1.1"
+SparseArrays = "<0.0.1, 1.6"
+Test = "<0.0.1, 1.6"
 julia = "1.6"
 
 [extras]

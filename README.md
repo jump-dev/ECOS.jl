@@ -1,6 +1,6 @@
 # ECOS.jl
 
-[![Build Status](https://github.com/jump-dev/ECOS.jl/workflows/CI/badge.svg?branch=master)](https://github.com/jump-dev/ECOS.jl/actions?query=workflow%3ACI)
+[![Build Status](https://github.com/jump-dev/ECOS.jl/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/jump-dev/ECOS.jl/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/jump-dev/ECOS.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jump-dev/ECOS.jl)
 
 [ECOS.jl](https://github.com/jump-dev/ECOS.jl) is a wrapper for the

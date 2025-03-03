@@ -33,11 +33,11 @@ function test_runtests()
     exclude = String[
         # ZerosBridge does not support ConstraintDual. These are tested below in
         # test_runtests_ZerosBridge
-        "test_conic_RotatedSecondOrderCone_INFEASIBLE_2",
-        "test_conic_linear_VectorOfVariables_2",
-        "test_linear_integration",
-        "test_quadratic_constraint_GreaterThan",
-        "test_quadratic_constraint_LessThan",
+        r"test_conic_RotatedSecondOrderCone_INFEASIBLE_2$",
+        r"test_conic_linear_VectorOfVariables_2$",
+        r"test_linear_integration$",
+        r"test_quadratic_constraint_GreaterThan$",
+        r"test_quadratic_constraint_LessThan$",
     ]
     if Sys.WORD_SIZE == 32
         # These tests fail on x86 Linux, returning ITERATION_LIMIT instead of

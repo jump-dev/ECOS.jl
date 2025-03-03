@@ -30,7 +30,7 @@ function test_runtests()
     @test model.optimizer.model.model_cache isa
           MOI.Utilities.UniversalFallback{ECOS.OptimizerCache}
     MOI.set(model, MOI.Silent(), true)
-    exclude = String[
+    exclude = [
         # ZerosBridge does not support ConstraintDual. These are tested below in
         # test_runtests_ZerosBridge
         r"test_conic_RotatedSecondOrderCone_INFEASIBLE_2$",

@@ -82,7 +82,7 @@ function test_runtests_ZerosBridge()
                 MOI.ObjectiveBound,
             ],
         ),
-        include = String[
+        include = [
             # ZerosBridge does not support ConstraintDual
             r"test_conic_RotatedSecondOrderCone_INFEASIBLE_2",
             r"test_conic_linear_VectorOfVariables_2",

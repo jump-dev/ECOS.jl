@@ -118,7 +118,7 @@ function MOI.empty!(optimizer::Optimizer)
 end
 
 function MOI.get(::Optimizer, ::MOI.Bridges.ListOfNonstandardBridges)
-    return [PermutedExponentialBridge{pfloat}]
+    return Type[PermutedExponentialBridge{pfloat}]
 end
 
 function _rows(

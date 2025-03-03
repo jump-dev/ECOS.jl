@@ -42,8 +42,8 @@ function test_runtests()
     if Sys.WORD_SIZE == 32
         # These tests fail on x86 Linux, returning ITERATION_LIMIT instead of
         # proving {primal,dual}_INFEASIBLE.
-        push!(exclude, "test_conic_linear_INFEASIBLE")
-        push!(exclude, "test_solve_TerminationStatus_DUAL_INFEASIBLE")
+        push!(exclude, r"test_conic_linear_INFEASIBLE$")
+        push!(exclude, r"test_solve_TerminationStatus_DUAL_INFEASIBLE$")
     end
     MOI.Test.runtests(
         model,
@@ -84,11 +84,11 @@ function test_runtests_ZerosBridge()
         ),
         include = String[
             # ZerosBridge does not support ConstraintDual
-            "test_conic_RotatedSecondOrderCone_INFEASIBLE_2",
-            "test_conic_linear_VectorOfVariables_2",
-            "test_linear_integration",
-            "test_quadratic_constraint_GreaterThan",
-            "test_quadratic_constraint_LessThan",
+            r"test_conic_RotatedSecondOrderCone_INFEASIBLE_2",
+            r"test_conic_linear_VectorOfVariables_2",
+            r"test_linear_integration",
+            r"test_quadratic_constraint_GreaterThan",
+            r"test_quadratic_constraint_LessThan",
         ],
     )
     return

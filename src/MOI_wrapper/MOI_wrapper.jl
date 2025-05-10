@@ -258,7 +258,7 @@ function _optimize!(dest::Optimizer, src::OptimizerCache)
         A.n,
         G.m,
         A.m,
-        Gh.sets.num_rows[1],
+        MOI.Utilities.num_rows(Gh.sets, MOI.Nonnegatives),
         length(q),
         q,
         num_exponential,
